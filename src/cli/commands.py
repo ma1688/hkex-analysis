@@ -11,6 +11,7 @@ import uuid
 import asyncio
 
 from src.agent.document_agent import get_document_agent
+from src.agent.context_injector import inject_query_context
 from src.tools.loader import load_all_tools
 from src.config.settings import get_settings
 from src.utils.text_cleaner import clean_text
@@ -252,18 +253,26 @@ def ask(
         hkex-agent ask "问题" -d  # 详细模式
     """
     try:
+        # 上下文注入 - Layer 2
+        enhanced_query, context_info = inject_query_context(question, "cli_user")
+
+        if context_info.get("injected"):
+            console.print(f"[dim]📍 上下文已注入 (置信度: {context_info.get('confidence', 0):.2f})[/dim]")
+            if show_thoughts:
+                console.print(f"[dim]💡 注入: {context_info.get('injected_context', [])[:1]}[/dim]\n")
+
         # 获取并显示模型信息
         from src.agent.document_agent import load_agent_config
         agent_config = load_agent_config("document")
         model_name = agent_config.get("model", "unknown")
         temperature = agent_config.get("temperature", 0.1)
-        
+
         # 获取Agent
         agent = get_document_agent()
-        
+
         # 会话ID
         session_id = session or str(uuid.uuid4())
-        
+
         # 配置
         config = {
             "configurable": {
@@ -271,13 +280,13 @@ def ask(
             },
             "recursion_limit": 50  # 增加递归限制（默认25）
         }
-        
+
         console.print(f"\n[bold cyan]问题:[/bold cyan] {question}")
         console.print(f"[dim]📍 模型: [cyan]{model_name}[/cyan] (温度: {temperature})[/dim]\n")
         
         if show_thoughts:
-            # 实时流式展示思考过程
-            answer = run_agent_stream(agent, question, config, console, detailed)
+            # 实时流式展示思考过程（使用增强后的查询）
+            answer = run_agent_stream(agent, enhanced_query, config, console, detailed)
             
             # 显示答案
             console.print()  # 空行
@@ -287,10 +296,10 @@ def ask(
                 border_style="green"
             ))
         else:
-            # 普通模式
+            # 普通模式（使用增强后的查询）
             with console.status("[bold green]思考中..."):
                 result = agent.invoke(
-                    {"messages": [("user", question)]},
+                    {"messages": [("user", enhanced_query)]},
                     config
                 )
                 
@@ -353,21 +362,27 @@ def chat(
         while True:
             # 获取用户输入
             question = console.input("\n[bold cyan]You:[/bold cyan] ")
-            
+
             if question.lower() in ["exit", "quit", "q"]:
                 console.print("[bold yellow]再见！[/bold yellow]")
                 break
-            
+
             if not question.strip():
                 continue
-            
+
+            # 上下文注入 - Layer 2
+            enhanced_query, context_info = inject_query_context(question, "cli_chat_user")
+
+            if context_info.get("injected"):
+                console.print(f"[dim]📍 上下文已注入 (置信度: {context_info.get('confidence', 0):.2f})[/dim]")
+
             # 调用Agent（流式或普通）
             if show_thoughts:
                 # 实时流式展示思考过程
                 console.print()  # 空行
-                
-                answer = run_agent_stream(agent, question, config, console, detailed)
-                
+
+                answer = run_agent_stream(agent, enhanced_query, config, console, detailed)
+
                 # 显示答案
                 console.print()  # 空行
                 console.print(Panel(
@@ -379,15 +394,15 @@ def chat(
                 # 普通模式（不显示思考过程）
                 with console.status("[bold green]思考中..."):
                     result = agent.invoke(
-                        {"messages": [("user", question)]},
+                        {"messages": [("user", enhanced_query)]},
                         config
                     )
-                    
+
                     messages = result.get("messages", [])
                     answer = messages[-1].content if messages else "无法生成答案"
                     # 清理可能的无效字符
                     answer = clean_text(answer)
-                
+
                 # 显示答案
                 console.print(f"\n[bold green]Agent:[/bold green] {answer}\n")
     

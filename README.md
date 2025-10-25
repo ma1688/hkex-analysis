@@ -10,6 +10,7 @@
 - 🚀 **双接口**: 提供FastAPI REST API和CLI命令行工具
 - 🔌 **可扩展**: 支持自定义工具扩展，插件化架构
 - 🌐 **多LLM支持**: 支持硅基流动和OpenAI，自动主备切换
+- ⏰ **时间感知**: 内置时间工具集，支持实时时间和市场状态查询
 
 ## 📋 前置要求
 
@@ -119,6 +120,11 @@ hkex-agent ask "对比腾讯和阿里最近的配售公告"
 
 # 提取关键信息
 hkex-agent ask "腾讯最近配售的折让率是多少？"
+
+# 时间相关查询
+hkex-agent ask "现在几点了？"
+hkex-agent ask "港股市场现在开盘了吗？"
+hkex-agent ask "今天是交易日吗？"
 ```
 
 ### API示例（Python）
@@ -257,15 +263,25 @@ sub_agents:
 
 | 工具名 | 功能 | 参数 |
 |--------|------|------|
+| **数据查询工具** |
 | `query_placing_data` | 查询配售数据 | stock_code, start_date, end_date, limit |
 | `query_ipo_data` | 查询IPO数据 | stock_code, start_date, end_date, limit |
 | `query_rights_data` | 查询供股数据 | stock_code, start_date, end_date, limit |
 | `query_consolidation_data` | 查询合股数据 | stock_code, start_date, end_date, limit |
+| **文档检索工具** |
 | `search_documents` | 搜索公告文档 | stock_code, document_type, start_date, limit |
 | `retrieve_chunks` | 检索文档切块 | doc_id, stock_code, keyword, limit |
+| **内容分析工具** |
 | `synthesize_chunks` | 合成多个切块 | chunks_json |
 | `extract_key_info` | 提取关键信息 | text, info_type |
 | `compare_data` | 对比两组数据 | data1_json, data2_json, dimensions |
+| **时间感知工具** |
+| `get_current_time` | 获取当前时间 | 无 |
+| `get_market_time` | 获取市场状态 | 无 |
+| `calculate_time_diff` | 计算时间差 | date_str, format_type |
+| `format_time_period` | 格式化时间段 | start_date, end_date |
+| `get_date_info` | 获取日期信息 | date_str |
+| **辅助工具** |
 | `get_document_metadata` | 获取文档元信息 | doc_id |
 
 ## ⚙️ 配置说明

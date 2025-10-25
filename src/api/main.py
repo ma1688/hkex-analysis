@@ -14,6 +14,7 @@ from src.api.schemas import (
 from src.agent.document_agent import get_document_agent
 from src.agent.supervisor import get_supervisor
 from src.agent.memory import get_memory_manager
+from src.agent.context_injector import inject_query_context
 from src.utils.clickhouse import get_clickhouse_manager
 from src.llm.manager import get_llm_manager
 from src.tools.loader import load_all_tools
@@ -78,20 +79,30 @@ async def query_agent(request: QueryRequest):
     
     try:
         logger.info(f"收到查询: {request.question[:50]}... (session: {session_id})")
-        
+
+        # 上下文注入 - Layer 2
+        enhanced_query, context_info = inject_query_context(
+            request.question,
+            request.user_id
+        )
+
+        if context_info.get("injected"):
+            logger.info(f"上下文已注入，置信度: {context_info.get('confidence', 0):.2f}")
+            logger.debug(f"注入上下文: {context_info.get('injected_context', [])}")
+
         # 获取Document Agent
         agent = get_document_agent()
-        
+
         # 构建配置
         config = {
             "configurable": {
                 "thread_id": session_id
             }
         }
-        
-        # 调用Agent
+
+        # 调用Agent（使用增强后的查询）
         result = agent.invoke(
-            {"messages": [("user", request.question)]},
+            {"messages": [("user", enhanced_query)]},
             config
         )
         
@@ -145,9 +156,25 @@ async def stream_query(request: QueryRequest):
     async def event_generator():
         try:
             logger.info(f"流式查询开始: {request.question[:50]}... (session: {session_id})")
-            
+
+            # 上下文注入 - Layer 2
+            enhanced_query, context_info = inject_query_context(
+                request.question,
+                request.user_id
+            )
+
+            if context_info.get("injected"):
+                logger.info(f"流式查询上下文已注入，置信度: {context_info.get('confidence', 0):.2f}")
+                logger.debug(f"流式查询注入上下文: {context_info.get('injected_context', [])}")
+
             # 发送开始事件
-            yield f"event: start\ndata: {json.dumps({'session_id': session_id, 'question': request.question})}\n\n"
+            start_data = {
+                'session_id': session_id,
+                'question': request.question,
+                'context_injected': context_info.get("injected", False),
+                'confidence': context_info.get("confidence", 0)
+            }
+            yield f"event: start\ndata: {json.dumps(start_data)}\n\n"
             
             # 获取Supervisor
             supervisor = get_supervisor()
@@ -155,24 +182,28 @@ async def stream_query(request: QueryRequest):
             # 构建初始状态（dict形式，包含supervisor节点需要的所有字段）
             initial_state = {
                 # 基础字段（Supervisor实际使用的）
-                "query": request.question,
+                "query": enhanced_query,  # 使用增强后的查询
+                "original_query": request.question,  # 保留原始查询
                 "user_id": request.user_id or "anonymous",
                 "session_id": session_id,
                 "messages": [],
-                "context": {},
-                
+                "context": {
+                    "context_injected": context_info.get("injected", False),
+                    "injection_info": context_info
+                },
+
                 # 规划字段
                 "plan": [],
                 "current_step": 0,
-                
+
                 # 执行字段
                 "agent_results": {},
                 "reflection_notes": [],
-                
+
                 # 会话字段
                 "user_profile": {},
                 "session_context": {},
-                
+
                 # 元数据字段
                 "processing_start": datetime.now(),
                 "tool_calls": [],
