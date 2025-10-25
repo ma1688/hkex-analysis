@@ -37,6 +37,11 @@ def enhance_market_data(query: str, stock_data: str = "") -> str:
         async def run_enhancement():
             enhancer = await get_data_enhancer()
             enhanced_data = await enhancer.enhance_data(query, data, "tool_call")
+
+            # 检查数据增强是否成功
+            if enhanced_data is None:
+                return "数据增强失败：所有数据源均无法获取数据"
+
             return enhancer.generate_enhancement_summary(enhanced_data)
 
         # 运行异步任务
@@ -72,6 +77,10 @@ def get_real_time_stock_info(symbol: str) -> str:
         async def run_enhancement():
             enhancer = await get_data_enhancer()
             enhanced_data = await enhancer.enhance_data(query, data, "real_time_query")
+
+            # 检查数据增强是否成功
+            if enhanced_data is None:
+                return f"❌ 无法获取 {symbol} 的股票信息：所有数据源均失败"
 
             # 构建返回信息
             result_parts = []

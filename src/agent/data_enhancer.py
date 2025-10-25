@@ -221,20 +221,10 @@ class DataEnhancer:
             self.request_count = 1
         self.last_request_time = current_time
 
-    def _create_fallback_market_data(self, symbol: str) -> MarketData:
-        """创建降级市场数据"""
-        logger.info(f"为 {symbol} 创建降级市场数据")
-
-        return MarketData(
-            symbol=symbol,
-            price=None,
-            change=None,
-            change_percent=None,
-            volume=None,
-            timestamp=datetime.now(HONGKONG_TZ),
-            source="fallback",
-            quality_score=0.2
-        )
+    def _create_failure_response(self, symbol: str, error_message: str) -> None:
+        """创建失败响应，返回None表示获取失败"""
+        logger.error(f"所有数据源都失败，无法获取 {symbol} 的市场数据: {error_message}")
+        return None
 
     async def _fetch_akshare(self, symbol: str) -> Optional[MarketData]:
         """从AkShare获取港股数据"""
@@ -251,16 +241,38 @@ class DataEnhancer:
             else:
                 hk_code = symbol.zfill(5)
 
-            logger.info(f"从AkShare获取港股数据: {symbol} -> {hk_code}")
+            logger.info(f"正在从AkShare获取港股实时数据: {symbol}")
 
             # 获取港股实时数据
-            data = ak.stock_hk_spot()
+            try:
+                # 尝试通过重定向输出抑制AkShare的进度条
+                import sys
+                from contextlib import redirect_stdout, redirect_stderr
+                import io
+
+                logger.info("正在获取港股实时行情数据...")
+
+                # 创建捕获对象
+                stdout_capture = io.StringIO()
+                stderr_capture = io.StringIO()
+
+                # 重定向标准输出和错误输出以抑制进度条
+                with redirect_stdout(stdout_capture), redirect_stderr(stderr_capture):
+                    data = ak.stock_hk_spot()
+
+                logger.info("港股数据获取完成")
+
+            except Exception as e:
+                logger.warning(f"AkShare数据获取异常: {e}")
+                return None
+
+            logger.info(f"正在解析港股数据，查找股票代码: {hk_code}")
 
             # 查找对应股票代码的数据
             stock_data = data[data['代码'] == hk_code]
 
             if stock_data.empty:
-                logger.warning(f"AkShare未找到股票代码 {hk_code} 的数据")
+                logger.warning(f"AkShare未找到股票代码 {hk_code} 的数据，可能代码不存在或未在港股名单中")
                 return None
 
             # 取第一条匹配记录
@@ -321,14 +333,10 @@ class DataEnhancer:
         try:
             await self._apply_rate_limit(symbol)
         except httpx.HTTPStatusError as e:
-            # 429重试次数超限，直接返回降级数据
-            logger.warning(f"符号 {symbol} 429重试次数超限，使用降级数据")
-            market_data = self._create_fallback_market_data(symbol)
-            self.market_data_cache[cache_key] = {
-                "data": market_data,
-                "timestamp": datetime.now(HONGKONG_TZ)
-            }
-            return market_data
+            # 429重试次数超限，直接返回失败
+            logger.warning(f"符号 {symbol} 429重试次数超限，无法获取数据")
+            self._create_failure_response(symbol, "429重试次数超限")
+            return None
 
         # 按优先级尝试从各个数据源获取
         market_data = None
@@ -385,17 +393,9 @@ class DataEnhancer:
 
         # 如果主数据源失败，尝试降级策略
         if not market_data and last_error:
-            logger.info(f"主数据源失败，使用降级策略: {symbol}")
-            market_data = self._create_fallback_market_data(symbol)
-
-        # 如果完全没有数据，创建空数据对象
-        if not market_data:
-            logger.warning(f"无法获取市场数据，返回空数据: {symbol}")
-            market_data = MarketData(
-                symbol=symbol,
-                source="failed",
-                quality_score=0.0
-            )
+            error_msg = f"所有数据源都失败: {last_error}"
+            self._create_failure_response(symbol, error_msg)
+            return None
 
         # 缓存数据
         self.market_data_cache[cache_key] = {
@@ -626,7 +626,8 @@ class DataEnhancer:
                 symbol_market_data = []
                 for symbol in symbols[:3]:  # 限制最多3个股票
                     m_data = await self.get_market_data(symbol)
-                    symbol_market_data.append(m_data)
+                    if m_data is not None:
+                        symbol_market_data.append(m_data)
 
                 if symbol_market_data:
                     market_data = symbol_market_data[0]  # 使用第一个
@@ -638,7 +639,7 @@ class DataEnhancer:
                         "data_source": market_data.source,
                         "quality_score": market_data.quality_score
                     }
-                    enrichment_sources.append("yahoo_finance")
+                    enrichment_sources.append("market_data")
                     enhancement_metadata["market_enhancement"] = True
 
             except Exception as e:
@@ -667,6 +668,12 @@ class DataEnhancer:
         current_time = datetime.now(HONGKONG_TZ)
         enhanced_data["_enhancement_timestamp"] = current_time.isoformat()
         enhanced_data["_data_age_hours"] = self._calculate_data_age(data, current_time)
+
+        # 检查是否获得任何有效数据
+        if not enrichment_sources and symbols:
+            # 如果有股票代码但没有获得任何数据源，说明所有数据源都失败
+            logger.warning("所有数据源都失败，无法获取市场数据")
+            return None
 
         result = EnhancedData(
             original_data=data,
