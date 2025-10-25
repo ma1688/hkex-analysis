@@ -44,9 +44,9 @@ planner_system_prompt: |
   - 需要"对比"/"比较" → recommended_tools: ["query_*_data", "compare_data"]（根据具体类型选择query工具）
 
   **参数模板提供**：
-  - stock_code类查询 → tool_params_template: {"stock_code": "从查询中提取的代码"}
-  - 日期范围查询 → tool_params_template: {"start_date": "YYYY-MM-DD", "end_date": "YYYY-MM-DD"}
-  - limit建议 → tool_params_template: {"limit": 5-10}
+  - stock_code类查询 → tool_params_template: {{"stock_code": "从查询中提取的代码"}}
+  - 日期范围查询 → tool_params_template: {{"start_date": "YYYY-MM-DD", "end_date": "YYYY-MM-DD"}}
+  - limit建议 → tool_params_template: {{"limit": 5-10}}
 
   ## 输出格式要求
 
@@ -212,10 +212,10 @@ document_agent_system_prompt: |
   用户: 查询腾讯控股最近的配售公告
   思考: 明确提到"配售"，应该使用Layer 1结构化工具query_placing_data
   行动: query_placing_data
-  参数: {
+  参数: {{
     "stock_code": "00700.hk",
     "limit": 5
-  }
+  }}
   观察: 返回配售价、比例、承销商等结构化数据
   结论: 直接从结构化数据生成答案，无需进一步检索
   ```
@@ -225,13 +225,13 @@ document_agent_system_prompt: |
   用户: 阿里巴巴最新公告详细说了什么？
   思考: 需要完整公告内容，不是简单的结构化数据查询
   行动1: search_documents
-  参数1: {"stock_code": "09988.hk", "limit": 1}
+  参数1: {{"stock_code": "09988.hk", "limit": 1}}
   观察1: 获得doc_id="xxx", 文档标题，发布日期
   行动2: retrieve_chunks
-  参数2: {"doc_id": "xxx", "limit": 30}
+  参数2: {{"doc_id": "xxx", "limit": 30}}
   观察2: 获得多个内容块
   行动3: synthesize_chunks
-  参数3: {"chunks_json": "[...]"}
+  参数3: {{"chunks_json": "[...]"}}
   观察3: 获得连贯的公告内容摘要
   结论: 生成基于完整内容的答案
   ```
@@ -245,11 +245,11 @@ document_agent_system_prompt: |
   行动2: query_placing_data(stock_code="09988.hk", limit=3)
   观察2: 获得阿里配售数据
   行动3: compare_data
-  参数3: {
+  参数3: {{
     "data1_json": "腾讯数据",
     "data2_json": "阿里数据",
     "comparison_dimensions": "配售价,折让率,配售比例,承销商"
-  }
+  }}
   观察3: 获得对比分析结果
   结论: 综合对比结果生成建议
   ```
