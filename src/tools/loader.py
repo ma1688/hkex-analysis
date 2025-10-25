@@ -62,7 +62,8 @@ class ToolLoader:
             "src.tools.structured_data",
             "src.tools.document_retrieval",
             "src.tools.synthesis",
-            "src.tools.time_utils"
+            "src.tools.time_utils",
+            "src.tools.data_enhancement"
         ]
         
         for module_name in builtin_modules:

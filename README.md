@@ -11,6 +11,7 @@
 - 🔌 **可扩展**: 支持自定义工具扩展，插件化架构
 - 🌐 **多LLM支持**: 支持硅基流动和OpenAI，自动主备切换
 - ⏰ **时间感知**: 内置时间工具集，支持实时时间和市场状态查询
+- 📊 **数据增强**: Layer 3智能数据增强，提供实时市场数据和质量评估
 
 ## 📋 前置要求
 
@@ -217,7 +218,9 @@ hkex-analysis/
    - 文档检索（search_documents、retrieve_chunks）
    - 内容合成（synthesize_chunks、extract_key_info）
 3. **LLM Manager**: 支持多模型切换和主备策略
-4. **配置系统**: 所有配置从YAML和环境变量读取
+4. **Layer 2 - 上下文注入**: 智能识别查询需求，自动注入时间、市场状态等上下文
+5. **Layer 3 - 数据增强**: 实时市场数据获取、数据质量评估和智能增强
+6. **配置系统**: 所有配置从YAML和环境变量读取
 
 ## 🛠️ 自定义扩展
 
@@ -281,6 +284,10 @@ sub_agents:
 | `calculate_time_diff` | 计算时间差 | date_str, format_type |
 | `format_time_period` | 格式化时间段 | start_date, end_date |
 | `get_date_info` | 获取日期信息 | date_str |
+| **Layer 3数据增强工具** |
+| `assess_data_quality` | 评估数据质量 | data_json |
+| `enhance_market_data` | 增强市场数据 | query, stock_data |
+| `get_real_time_stock_info` | 获取实时股票信息 | symbol |
 | **辅助工具** |
 | `get_document_metadata` | 获取文档元信息 | doc_id |
 
@@ -332,13 +339,26 @@ hkex-agent ask "查询00700.hk最近的配售数据"
 
 ## 🚧 未来扩展（预留）
 
-当前实现为**Phase 1基础版本**，包含：
+当前实现为**Phase 1-3分层架构**，包含：
+
+**Phase 1 - 基础版本**：
 - ✅ Document Agent
 - ✅ 数据库工具集
 - ✅ 文档检索工具
 - ✅ API和CLI接口
 
-**Phase 2-4扩展功能**（架构已预留）：
+**Phase 2 - 上下文注入**（已实现）：
+- ✅ 智能查询分析
+- ✅ 时间上下文自动注入
+- ✅ 市场状态感知
+- ✅ 业务数据时效性标注
+
+**Phase 3 - 数据增强**（开发中）：
+- 🔄 实时市场数据获取
+- 🔄 数据质量评估
+- 🔄 智能数据增强
+
+**Phase 4-5扩展功能**（架构已预留）：
 - ⏳ Planner模块（任务规划）
 - ⏳ Supervisor协调器（多Agent调度）
 - ⏳ Reflector模块（结果验证）

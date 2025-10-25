@@ -4,6 +4,15 @@ import logging
 from datetime import datetime
 from typing import Dict, List, Optional, Tuple
 import pytz
+import asyncio
+
+# Layer 3数据增强导入
+try:
+    from .data_enhancer import enhance_query_data, EnhancedData
+    LAYER_3_AVAILABLE = True
+except ImportError:
+    LAYER_3_AVAILABLE = False
+    logging.warning("Layer 3 data enhancement not available")
 
 # 香港时区
 HONGKONG_TZ = pytz.timezone('Asia/Hong_Kong')
@@ -203,13 +212,15 @@ class ContextInjector:
             logger.error(f"生成时间上下文失败: {e}")
             return "时间信息获取失败。"
 
-    def inject_context(self, query: str, user_id: Optional[str] = None) -> Tuple[str, Dict]:
+    async def inject_context_async(self, query: str, user_id: Optional[str] = None,
+                                   tool_data: Optional[Dict] = None) -> Tuple[str, Dict]:
         """
-        为查询注入上下文信息
+        异步为查询注入上下文信息（包含Layer 3数据增强）
 
         Args:
             query: 原始用户查询
             user_id: 用户ID（可选，用于个性化上下文）
+            tool_data: 工具返回的数据（可选，用于Layer 3增强）
 
         Returns:
             增强后的查询和上下文信息
@@ -223,9 +234,25 @@ class ContextInjector:
             context_info["market_aware"],
             context_info["business_critical"]
         ]):
+            # 仍然尝试Layer 3数据增强
+            if LAYER_3_AVAILABLE and tool_data:
+                try:
+                    enhanced_data = await enhance_query_data(query, tool_data, "context_injection")
+                    if enhanced_data.quality and enhanced_data.quality.score > 0.7:
+                        summary = self._generate_layer_3_summary(enhanced_data)
+                        enhanced_query = f"{summary}\n\n用户查询：{query}"
+                        return enhanced_query, {
+                            "injected": True,
+                            "reason": "layer_3_only",
+                            "layer_3_enhancement": True,
+                            "enhanced_data": enhanced_data.enhanced_data
+                        }
+                except Exception as e:
+                    logger.warning(f"Layer 3增强失败: {e}")
+
             return query, {"injected": False, "reason": "no_context_needed"}
 
-        # 生成上下文
+        # 生成Layer 2上下文
         context_parts = []
 
         if context_info["time_sensitive"] or context_info["market_aware"]:
@@ -237,6 +264,17 @@ class ContextInjector:
             now_hk = datetime.now(HONGKONG_TZ)
             date_str = now_hk.strftime("%Y-%m-%d")
             context_parts.append(f"[数据时效性] 基于查询日期 {date_str} 的数据分析")
+
+        # Layer 3数据增强
+        layer_3_summary = None
+        if LAYER_3_AVAILABLE and tool_data:
+            try:
+                enhanced_data = await enhance_query_data(query, tool_data, "context_injection")
+                if enhanced_data.quality and enhanced_data.quality.score > 0.5:
+                    layer_3_summary = self._generate_layer_3_summary(enhanced_data)
+                    context_parts.append(f"[数据增强] {layer_3_summary}")
+            except Exception as e:
+                logger.warning(f"Layer 3增强失败: {e}")
 
         # 构建增强查询
         if context_parts:
@@ -252,13 +290,77 @@ class ContextInjector:
                 },
                 "confidence": context_info["confidence"],
                 "detected_patterns": context_info["detected_patterns"][:5],  # 限制返回的模式数量
-                "injected_context": context_parts
+                "injected_context": context_parts,
+                "layer_3_enhanced": layer_3_summary is not None
             }
 
-            logger.info(f"上下文注入完成，置信度: {context_info['confidence']:.2f}")
+            logger.info(f"上下文注入完成（包含Layer 3增强），置信度: {context_info['confidence']:.2f}")
             return enhanced_query, injection_info
 
         return query, {"injected": False, "reason": "no_patterns_matched"}
+
+    def inject_context(self, query: str, user_id: Optional[str] = None) -> Tuple[str, Dict]:
+        """
+        为查询注入上下文信息（同步版本，保持兼容性）
+
+        Args:
+            query: 原始用户查询
+            user_id: 用户ID（可选，用于个性化上下文）
+
+        Returns:
+            增强后的查询和上下文信息
+        """
+        # 对于同步调用，不包含Layer 3数据增强
+        return asyncio.run(self.inject_context_async(query, user_id, None))
+
+    def _generate_layer_3_summary(self, enhanced_data) -> str:
+        """
+        生成Layer 3数据增强摘要
+
+        Args:
+            enhanced_data: 增强后的数据
+
+        Returns:
+            摘要文本
+        """
+        summary_parts = []
+
+        # 质量信息
+        if enhanced_data.quality:
+            quality_score = enhanced_data.quality.score
+            if quality_score >= 0.8:
+                quality_desc = "优秀"
+            elif quality_score >= 0.6:
+                quality_desc = "良好"
+            elif quality_score >= 0.4:
+                quality_desc = "一般"
+            else:
+                quality_desc = "需改进"
+            summary_parts.append(f"数据质量{quality_desc}")
+
+        # 市场数据信息
+        if enhanced_data.market_data and enhanced_data.market_data.price:
+            price_info = (
+                f"当前股价 {enhanced_data.market_data.price:.2f} "
+                f"({enhanced_data.market_data.change:+.2f}, {enhanced_data.market_data.change_percent:+.1f}%)"
+            )
+            summary_parts.append(price_info)
+
+        # 时效性信息
+        if "_data_age_hours" in enhanced_data.enhanced_data:
+            age_hours = enhanced_data.enhanced_data["_data_age_hours"]
+            if age_hours is not None:
+                if age_hours < 1:
+                    age_desc = "实时"
+                elif age_hours < 24:
+                    age_desc = f"{age_hours:.0f}小时内"
+                elif age_hours < 24 * 7:
+                    age_desc = f"{age_hours/24:.0f}天内"
+                else:
+                    age_desc = f"{age_hours/(24*7):.0f}周内"
+                summary_parts.append(f"数据时效{age_desc}")
+
+        return "；".join(summary_parts) if summary_parts else "数据已增强"
 
 
 # 全局单例
