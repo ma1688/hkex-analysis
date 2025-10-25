@@ -1,0 +1,66 @@
+# Supervisor配置
+supervisor:
+  max_reflection_iterations: 3
+  enable_self_correction: true
+  plan_model: "deepseek-ai/DeepSeek-V3.1-Terminus"  # 规划用强模型
+  reflection_model: "deepseek-ai/DeepSeek-V3.1-Terminus"  # 反思用强模型
+  planning_timeout: 60
+  reflection_threshold: 0.8  # 质量分数阈值
+
+# 子Agent配置
+sub_agents:
+  document:
+    enabled: true
+    name: "公告文档分析Agent"
+    model: "deepseek-ai/DeepSeek-V3.1-Terminus"  # 快速模型（2-5秒响应）
+    fallback_model: "deepseek-ai/DeepSeek-V3.1-Terminus"  # 备用强模型
+    temperature: 0.1
+    max_iterations: 5
+    tools:
+      - search_documents
+      - retrieve_chunks
+      - query_ipo_data
+      - query_placing_data
+      - query_rights_data
+      - query_consolidation_data
+      - synthesize_chunks
+      - extract_key_info
+    system_prompt_template: "document_agent"
+  
+  market:
+    enabled: false  # 预留扩展
+    name: "行情数据分析Agent"
+    model: "deepseek-ai/DeepSeek-V3.1-Terminus"  # 快速模型
+    temperature: 0
+    tools: []
+    system_prompt_template: "market_agent"
+  
+  financial:
+    enabled: false
+    name: "财报分析Agent"
+    model: "deepseek-ai/DeepSeek-V3.1-Terminus"  # 分析用强模型
+    temperature: 0.2
+    tools: []
+    system_prompt_template: "financial_agent"
+  
+  news:
+    enabled: false
+    name: "新闻舆情Agent"
+    model: "deepseek-ai/DeepSeek-V3.1-Terminus"  # 快速模型
+    temperature: 0.3
+    tools: []
+    system_prompt_template: "news_agent"
+
+# 记忆配置
+memory:
+  short_term:
+    enabled: true
+    max_messages: 1000
+    trim_strategy: "recent"  # recent/summarize
+  
+  long_term:
+    enabled: true
+    store_backend: "memory"
+    user_profile_enabled: true
+    knowledge_extraction_enabled: true
+

@@ -1,0 +1,26 @@
+# 自定义工具加载
+custom_tools:
+  enabled: true
+  auto_load_directory: "src/tools/custom"
+  disabled_tools: []  # 禁用特定工具名称列表
+
+# 工具执行配置
+tool_execution:
+  timeout: 30
+  max_retries: 2
+  retry_delay: 1.0
+  parallel_execution: true
+  max_parallel: 3
+
+# 数据库工具配置
+database_tools:
+  cache_enabled: true
+  cache_ttl: 300  # 秒
+  max_results_per_query: 100
+  
+# LLM分析工具配置
+llm_tools:
+  synthesis_model: "deepseek-ai/DeepSeek-V3.1-Terminus"
+  extraction_model: "deepseek-ai/DeepSeek-V3.1-Terminus"
+  max_chunks_per_synthesis: 10
+
