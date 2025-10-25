@@ -81,19 +81,28 @@ class DataEnhancer:
 
         # 数据源配置
         self.data_sources = {
+            "akshare": {
+                "enabled": True,
+                "timeout": 15,
+                "priority": 1,  # 最高优先级，稳定免费
+                "fallback": True,
+                "description": "AkShare - 国内开源金融数据接口"
+            },
             "yahoo_finance": {
                 "enabled": True,
                 "base_url": "https://query1.finance.yahoo.com/v8/finance/chart",
                 "timeout": 10,
-                "priority": 1,
-                "fallback": True  # 是否作为降级选项
+                "priority": 2,  # 降级为第二优先级
+                "fallback": True,
+                "description": "Yahoo Finance - 免费但有频率限制"
             },
             "alpha_vantage": {
                 "enabled": False,  # 需要API key
                 "base_url": "https://www.alphavantage.co/query",
                 "timeout": 10,
-                "priority": 2,
-                "fallback": False
+                "priority": 3,
+                "fallback": False,
+                "description": "Alpha Vantage - 需要付费API key"
             }
         }
 
@@ -227,6 +236,71 @@ class DataEnhancer:
             quality_score=0.2
         )
 
+    async def _fetch_akshare(self, symbol: str) -> Optional[MarketData]:
+        """从AkShare获取港股数据"""
+        try:
+            import akshare as ak
+            import pandas as pd
+            from datetime import datetime
+
+            # 标准化股票代码格式
+            if symbol.endswith('.HK'):
+                hk_code = symbol.replace('.HK', '')
+                # 转换为5位数字格式
+                hk_code = hk_code.zfill(5)
+            else:
+                hk_code = symbol.zfill(5)
+
+            logger.info(f"从AkShare获取港股数据: {symbol} -> {hk_code}")
+
+            # 获取港股实时数据
+            data = ak.stock_hk_spot()
+
+            # 查找对应股票代码的数据
+            stock_data = data[data['代码'] == hk_code]
+
+            if stock_data.empty:
+                logger.warning(f"AkShare未找到股票代码 {hk_code} 的数据")
+                return None
+
+            # 取第一条匹配记录
+            row = stock_data.iloc[0]
+
+            # 解析数据
+            price = float(row['最新价']) if pd.notna(row['最新价']) else None
+            change = float(row['涨跌额']) if pd.notna(row['涨跌额']) else None
+            change_percent = float(row['涨跌幅']) if pd.notna(row['涨跌幅']) else None
+            volume = int(row['成交量']) if pd.notna(row['成交量']) else None
+
+            # 解析时间
+            timestamp = datetime.now(HONGKONG_TZ)  # 使用当前时间
+            if pd.notna(row['日期时间']):
+                try:
+                    # 尝试解析时间戳
+                    time_str = str(row['日期时间'])
+                    timestamp = datetime.strptime(time_str, '%Y/%m/%d %H:%M:%S')
+                    timestamp = HONGKONG_TZ.localize(timestamp)
+                except Exception as e:
+                    logger.debug(f"时间解析失败: {e}, 使用当前时间")
+
+            market_data = MarketData(
+                symbol=symbol,
+                price=price,
+                change=change,
+                change_percent=change_percent,
+                volume=volume,
+                timestamp=timestamp,
+                source="akshare",
+                quality_score=0.9  # AkShare数据质量较高，且稳定
+            )
+
+            logger.info(f"成功从AkShare获取数据: {symbol}, 价格: {price}, 涨跌: {change}")
+            return market_data
+
+        except Exception as e:
+            logger.error(f"AkShare API错误 {symbol}: {e}")
+            return None
+
     async def get_market_data(self, symbol: str) -> MarketData:
         """
         获取市场数据
@@ -256,34 +330,58 @@ class DataEnhancer:
             }
             return market_data
 
-        # 尝试从各个数据源获取
+        # 按优先级尝试从各个数据源获取
         market_data = None
         last_error = None
 
-        # Yahoo Finance (免费且相对可靠)
-        if self.data_sources["yahoo_finance"]["enabled"]:
+        # 按优先级排序数据源
+        sorted_sources = sorted(
+            [(name, config) for name, config in self.data_sources.items() if config["enabled"]],
+            key=lambda x: x[1]["priority"]
+        )
+
+        for source_name, source_config in sorted_sources:
+            if not source_config["enabled"]:
+                continue
+
             try:
-                market_data = await self._fetch_yahoo_finance(symbol)
-                if market_data:
-                    logger.info(f"从Yahoo Finance获取到数据: {symbol}")
-                    # 重置429重试计数
-                    if symbol in self._429_retry_count:
-                        del self._429_retry_count[symbol]
+                if source_name == "akshare":
+                    market_data = await self._fetch_akshare(symbol)
+                    if market_data:
+                        logger.info(f"从AkShare获取到数据: {symbol}")
+                        # 重置429重试计数
+                        if symbol in self._429_retry_count:
+                            del self._429_retry_count[symbol]
+                        break  # 成功获取数据，退出循环
+
+                elif source_name == "yahoo_finance":
+                    market_data = await self._fetch_yahoo_finance(symbol)
+                    if market_data:
+                        logger.info(f"从Yahoo Finance获取到数据: {symbol}")
+                        # 重置429重试计数
+                        if symbol in self._429_retry_count:
+                            del self._429_retry_count[symbol]
+                        break  # 成功获取数据，退出循环
+
             except httpx.HTTPStatusError as e:
                 last_error = f"HTTP {e.response.status_code}"
-                if e.response.status_code == 429:
-                    logger.warning(f"Yahoo Finance请求过于频繁 {symbol}: {last_error}")
-                    # 记录429错误
-                    self._429_retry_count[symbol] = self._429_retry_count.get(symbol, 0) + 1
-                    # 增加缓存时间以减少后续请求
-                    self.cache_ttl = min(self.cache_ttl * 2, 1800)  # 最多30分钟
-                elif e.response.status_code == 404:
-                    logger.warning(f"Yahoo Finance找不到股票代码 {symbol}: {last_error}")
+                if source_name == "yahoo_finance":
+                    if e.response.status_code == 429:
+                        logger.warning(f"Yahoo Finance请求过于频繁 {symbol}: {last_error}")
+                        # 记录429错误
+                        self._429_retry_count[symbol] = self._429_retry_count.get(symbol, 0) + 1
+                        # 增加缓存时间以减少后续请求
+                        self.cache_ttl = min(self.cache_ttl * 2, 1800)  # 最多30分钟
+                    elif e.response.status_code == 404:
+                        logger.warning(f"Yahoo Finance找不到股票代码 {symbol}: {last_error}")
+                    else:
+                        logger.warning(f"Yahoo Finance HTTP错误 {symbol}: {last_error}")
                 else:
-                    logger.warning(f"Yahoo Finance HTTP错误 {symbol}: {last_error}")
+                    logger.warning(f"{source_name} HTTP错误 {symbol}: {last_error}")
+
             except Exception as e:
                 last_error = str(e)
-                logger.warning(f"Yahoo Finance获取数据失败 {symbol}: {last_error}")
+                logger.warning(f"{source_name}获取数据失败 {symbol}: {last_error}")
 
         # 如果主数据源失败，尝试降级策略
         if not market_data and last_error:
