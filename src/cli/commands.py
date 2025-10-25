@@ -65,86 +65,116 @@ async def stream_agent_with_display(agent, question: str, config: dict, console:
         # 初始显示
         elapsed_time = 0
         with console.status(f"[bold green]⏳ Agent思考中... [cyan]{elapsed_time:.1f}s[/cyan] [dim]({mode_hint})[/dim]", spinner="dots") as status:
-            # 流式处理每个事件
-            async for event in agent.astream(input_data, config):
-                event_count += 1
-                current_time = time.time()
-                elapsed_time = current_time - thinking_start
-                
-                # 提取事件信息（移到循环内部）
-                for key, value in event.items():
-                    step_count += 1
-                    elapsed = f"{current_time - last_update:.1f}s"
-                    last_update = current_time
-                    
-                    # 计算总思考时间
-                    total_elapsed = current_time - thinking_start
-                    
-                    # 在spinner中显示当前操作（包含总时间）
-                    node_symbol = "🔄" if key == "tools" else "🧠"
-                    
-                    # Spinner中只显示简要信息
-                    spinner_text = f"[bold green]{node_symbol} 步骤{step_count}: {key}[/bold green] [cyan]总计{total_elapsed:.1f}s[/cyan]"
-                    status.update(spinner_text, spinner="dots")
-                    
-                    # 停止spinner，打印详细内容，然后继续
-                    status.stop()
-                    console.print(f"[dim cyan]{node_symbol} 步骤{step_count}: {key}[/dim cyan] [cyan]总计{total_elapsed:.1f}s[/cyan] [dim](+{elapsed})[/dim]")
-                    
-                    # 打印消息详情
-                    if isinstance(value, dict) and "messages" in value:
-                        messages = value.get("messages", [])
-                        if messages:
-                            last_message = messages[-1]
-                            
-                            # 检查是否是AI消息
-                            if hasattr(last_message, 'content'):
-                                content = clean_text(last_message.content)
-                                
-                                # 如果包含工具调用
-                                if hasattr(last_message, 'tool_calls') and last_message.tool_calls:
-                                    for tool_call in last_message.tool_calls:
-                                        tool_name = tool_call.get('name', 'unknown')
-                                        console.print(f"[yellow]  🔧 {tool_name}[/yellow]")
-                                        
-                                        # 详细模式：显示参数
-                                        if detailed:
-                                            tool_args = tool_call.get('args', {})
-                                            if tool_args:
-                                                import json
-                                                args_str = json.dumps(tool_args, ensure_ascii=False, indent=2)
-                                                # 限制参数显示长度
-                                                if len(args_str) > 200:
-                                                    args_str = args_str[:200] + "..."
-                                                console.print(f"[dim]  📋 {args_str}[/dim]")
-                                else:
-                                    # 显示思考内容
-                                    if content and len(content) > 5:
-                                        if detailed:
-                                            # 详细模式：多行显示
-                                            preview = content[:200].replace('\n', ' ')
-                                            console.print(f"[green]  💭 {preview}...[/green]")
-                                        else:
-                                            # 简洁模式：一行显示
-                                            preview = content[:50].replace('\n', ' ')
-                                            console.print(f"[green]  💭 {preview}...[/green]")
-                            
-                            # 检查是否是工具消息
-                            elif hasattr(last_message, 'name'):
-                                tool_name = last_message.name if hasattr(last_message, 'name') else 'tool'
-                                content = clean_text(last_message.content) if hasattr(last_message, 'content') else ''
-                                
-                                if detailed:
-                                    preview = content[:200].replace('\n', ' ')
-                                else:
-                                    preview = content[:50].replace('\n', ' ')
-                                console.print(f"[blue]  ✅ {tool_name}: {preview}...[/blue]")
-                    
-                    # 重新启动spinner
-                    status.start()
-                    
-                    # 添加微小延迟
-                    await asyncio.sleep(0.02)
+
+            # 创建后台时间更新任务
+            update_interval = 0.5  # 每0.5秒更新一次时间
+            should_stop_time_update = False
+
+            async def update_time_display():
+                """后台任务：定期更新时间显示"""
+                nonlocal should_stop_time_update
+                while not should_stop_time_update:
+                    await asyncio.sleep(update_interval)
+                    current_time = time.time()
+                    elapsed = current_time - thinking_start
+                    status.update(
+                        f"[bold green]⏳ Agent思考中... [cyan]{elapsed:.1f}s[/cyan] [dim]({mode_hint})[/dim]",
+                        spinner="dots"
+                    )
+
+            # 启动时间更新任务
+            time_update_task = asyncio.create_task(update_time_display())
+
+            try:
+                # 流式处理每个事件
+                async for event in agent.astream(input_data, config):
+                    event_count += 1
+                    current_time = time.time()
+                    elapsed_time = current_time - thinking_start
+
+                    # 提取事件信息（移到循环内部）
+                    for key, value in event.items():
+                        step_count += 1
+                        elapsed = f"{current_time - last_update:.1f}s"
+                        last_update = current_time
+
+                        # 计算总思考时间
+                        total_elapsed = current_time - thinking_start
+
+                        # 在spinner中显示当前操作（包含总时间）
+                        node_symbol = "🔄" if key == "tools" else "🧠"
+
+                        # Spinner中只显示简要信息
+                        spinner_text = f"[bold green]{node_symbol} 步骤{step_count}: {key}[/bold green] [cyan]总计{total_elapsed:.1f}s[/cyan]"
+                        status.update(spinner_text, spinner="dots")
+
+                        # 停止spinner，打印详细内容，然后继续
+                        status.stop()
+                        console.print(f"[dim cyan]{node_symbol} 步骤{step_count}: {key}[/dim cyan] [cyan]总计{total_elapsed:.1f}s[/cyan] [dim](+{elapsed})[/dim]")
+
+                        # 打印消息详情
+                        if isinstance(value, dict) and "messages" in value:
+                            messages = value.get("messages", [])
+                            if messages:
+                                last_message = messages[-1]
+
+                                # 检查是否是AI消息
+                                if hasattr(last_message, 'content'):
+                                    content = clean_text(last_message.content)
+
+                                    # 如果包含工具调用
+                                    if hasattr(last_message, 'tool_calls') and last_message.tool_calls:
+                                        for tool_call in last_message.tool_calls:
+                                            tool_name = tool_call.get('name', 'unknown')
+                                            console.print(f"[yellow]  🔧 {tool_name}[/yellow]")
+
+                                            # 详细模式：显示参数
+                                            if detailed:
+                                                tool_args = tool_call.get('args', {})
+                                                if tool_args:
+                                                    import json
+                                                    args_str = json.dumps(tool_args, ensure_ascii=False, indent=2)
+                                                    # 限制参数显示长度
+                                                    if len(args_str) > 200:
+                                                        args_str = args_str[:200] + "..."
+                                                    console.print(f"[dim]  📋 {args_str}[/dim]")
+                                    else:
+                                        # 显示思考内容
+                                        if content and len(content) > 5:
+                                            if detailed:
+                                                # 详细模式：多行显示
+                                                preview = content[:200].replace('\n', ' ')
+                                                console.print(f"[green]  💭 {preview}...[/green]")
+                                            else:
+                                                # 简洁模式：一行显示
+                                                preview = content[:50].replace('\n', ' ')
+                                                console.print(f"[green]  💭 {preview}...[/green]")
+
+                                # 检查是否是工具消息
+                                elif hasattr(last_message, 'name'):
+                                    tool_name = last_message.name if hasattr(last_message, 'name') else 'tool'
+                                    content = clean_text(last_message.content) if hasattr(last_message, 'content') else ''
+
+                                    if detailed:
+                                        preview = content[:200].replace('\n', ' ')
+                                    else:
+                                        preview = content[:50].replace('\n', ' ')
+                                    console.print(f"[blue]  ✅ {tool_name}: {preview}...[/blue]")
+
+                        # 重新启动spinner
+                        status.start()
+
+                        # 添加微小延迟
+                        await asyncio.sleep(0.02)
+
+            finally:
+                # 停止时间更新任务
+                should_stop_time_update = True
+                time_update_task.cancel()
+                try:
+                    await time_update_task
+                except asyncio.CancelledError:
+                    pass
         
         # 获取最终答案
         if event:
