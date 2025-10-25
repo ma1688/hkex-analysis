@@ -1,21 +1,25 @@
+# ==================== Agent配置文件 ====================
+# 该文件用于配置Agent的行为、模型选择、工具列表等
+# 注意：Agent的系统提示词现在统一在 config/prompts/prompts.yaml 中配置
+
 # Supervisor配置
 supervisor:
   max_reflection_iterations: 3
   enable_self_correction: true
-  plan_model: "deepseek-ai/DeepSeek-V3.1-Terminus"  # 规划用强模型
-  reflection_model: "deepseek-ai/DeepSeek-V3.1-Terminus"  # 反思用强模型
+  # plan_model 和 reflection_model 从 Settings 读取（SILICONFLOW_STRONG_MODEL）
   planning_timeout: 60
   reflection_threshold: 0.8  # 质量分数阈值
 
 # 子Agent配置
+# 说明：system_prompt_template 字段保留用于文档说明，实际提示词从 config/prompts/prompts.yaml 加载
 sub_agents:
   document:
     enabled: true
     name: "公告文档分析Agent"
-    model: "deepseek-ai/DeepSeek-V3.1-Terminus"  # 快速模型（2-5秒响应）
-    fallback_model: "deepseek-ai/DeepSeek-V3.1-Terminus"  # 备用强模型
+    # model 和 fallback_model 从 Settings 读取（SILICONFLOW_FAST_MODEL 和 SILICONFLOW_STRONG_MODEL）
     temperature: 0.1
-    max_iterations: 5
+    # max_iterations 从 Settings 读取（AGENT_MAX_ITERATIONS）
+    # 系统提示词：从 config/prompts/prompts.yaml 中的 document_agent_system_prompt 加载
     tools:
       - search_documents
       - retrieve_chunks
@@ -35,42 +39,41 @@ sub_agents:
       - enhance_market_data
       - get_real_time_stock_info
       - assess_data_quality
-    system_prompt_template: "document_agent"
   
   market:
     enabled: false  # 预留扩展
     name: "行情数据分析Agent"
-    model: "deepseek-ai/DeepSeek-V3.1-Terminus"  # 快速模型
+    # model 从 Settings 读取（SILICONFLOW_FAST_MODEL）
+    # 系统提示词：从 config/prompts/prompts.yaml 中的 market_agent_system_prompt 加载
     temperature: 0
-    tools: []
-    system_prompt_template: "market_agent"
+    tools: [ ]
   
   financial:
     enabled: false
     name: "财报分析Agent"
-    model: "deepseek-ai/DeepSeek-V3.1-Terminus"  # 分析用强模型
+    # model 从 Settings 读取（SILICONFLOW_STRONG_MODEL）
+    # 系统提示词：从 config/prompts/prompts.yaml 中的 financial_agent_system_prompt 加载
     temperature: 0.2
-    tools: []
-    system_prompt_template: "financial_agent"
+    tools: [ ]
   
   news:
     enabled: false
     name: "新闻舆情Agent"
-    model: "deepseek-ai/DeepSeek-V3.1-Terminus"  # 快速模型
+    # model 从 Settings 读取（SILICONFLOW_FAST_MODEL）
+    # 系统提示词：从 config/prompts/prompts.yaml 中的 news_agent_system_prompt 加载
     temperature: 0.3
-    tools: []
-    system_prompt_template: "news_agent"
+    tools: [ ]
 
 # 记忆配置
 memory:
   short_term:
     enabled: true
-    max_messages: 1000
+    # max_messages 从 Settings 读取（MEMORY_MAX_MESSAGES）
     trim_strategy: "recent"  # recent/summarize
   
   long_term:
     enabled: true
-    store_backend: "memory"
+    # store_backend 从 Settings 读取（MEMORY_STORE_BACKEND）
     user_profile_enabled: true
     knowledge_extraction_enabled: true
 
