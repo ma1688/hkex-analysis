@@ -1,7 +1,8 @@
 """API请求/响应数据模型"""
-from pydantic import BaseModel, Field
-from typing import Optional, Literal, Any
 from datetime import datetime
+from typing import Optional, Literal
+
+from pydantic import BaseModel, Field
 
 
 class QueryRequest(BaseModel):
@@ -10,7 +11,7 @@ class QueryRequest(BaseModel):
     session_id: Optional[str] = Field(None, description="会话ID")
     user_id: Optional[str] = Field(None, description="用户ID")
     stream: bool = Field(False, description="是否流式返回")
-    
+
     model_config = {
         "json_schema_extra": {
             "example": {
@@ -47,7 +48,7 @@ class StreamEvent(BaseModel):
     """流式事件"""
     event: Literal[
         "start", "plan", "step", "progress",
-        "tool_call", "tool_result", "reflection", 
+        "tool_call", "tool_result", "reflection",
         "answer", "error", "done"
     ]
     data: dict
@@ -79,4 +80,3 @@ class ToolInfo(BaseModel):
     parameters: dict
     agent: str
     enabled: bool = True
-

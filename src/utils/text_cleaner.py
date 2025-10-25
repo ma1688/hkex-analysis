@@ -17,7 +17,7 @@ def clean_text(text: str) -> str:
     """
     if not isinstance(text, str):
         return text
-    
+
     try:
         # 尝试编码为UTF-8，如果失败则使用替换策略
         text.encode('utf-8')
@@ -47,7 +47,7 @@ def clean_dict(data: dict) -> dict:
     """
     if not isinstance(data, dict):
         return data
-    
+
     cleaned = {}
     for key, value in data.items():
         if isinstance(value, str):
@@ -56,14 +56,14 @@ def clean_dict(data: dict) -> dict:
             cleaned[key] = clean_dict(value)
         elif isinstance(value, list):
             cleaned[key] = [
-                clean_text(item) if isinstance(item, str) 
+                clean_text(item) if isinstance(item, str)
                 else clean_dict(item) if isinstance(item, dict)
                 else item
                 for item in value
             ]
         else:
             cleaned[key] = value
-    
+
     return cleaned
 
 
@@ -79,7 +79,7 @@ def clean_list(data: list) -> list:
     """
     if not isinstance(data, list):
         return data
-    
+
     return [
         clean_text(item) if isinstance(item, str)
         else clean_dict(item) if isinstance(item, dict)
@@ -119,10 +119,10 @@ def clean_tool_output(func):
         def my_tool(...):
             return some_data
     """
+
     @wraps(func)
     def wrapper(*args, **kwargs):
         result = func(*args, **kwargs)
         return clean_any(result)
-    
-    return wrapper
 
+    return wrapper

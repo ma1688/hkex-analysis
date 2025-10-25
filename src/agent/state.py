@@ -1,8 +1,9 @@
 """Agent状态定义"""
-from langgraph.graph import MessagesState
-from typing import TypedDict, Annotated, Optional, Literal
-from operator import add
 from datetime import datetime
+from operator import add
+from typing import TypedDict, Annotated, Optional, Literal
+
+from langgraph.graph import MessagesState
 
 
 class SupervisorState(MessagesState):
@@ -10,17 +11,17 @@ class SupervisorState(MessagesState):
     # 规划
     plan: list[dict]
     current_step: int
-    
+
     # 执行
     agent_results: dict  # {agent_name: result}
     reflection_notes: Annotated[list[str], add]
-    
+
     # 会话
     user_id: Optional[str]
     session_id: str
     user_profile: dict
     session_context: dict
-    
+
     # 元数据
     processing_start: datetime
     tool_calls: Annotated[list[dict], add]
@@ -49,4 +50,3 @@ class ReflectionResult(TypedDict):
     suggested_actions: list[str]
     should_retry: bool
     summary: str
-

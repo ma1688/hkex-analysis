@@ -213,10 +213,10 @@ hkex-analysis/
 ### 核心组件
 
 1. **Document Agent**: 基于`create_react_agent`构建的公告分析Agent
-2. **工具集**: 
-   - 结构化数据查询（IPO、配售、供股、合股）
-   - 文档检索（search_documents、retrieve_chunks）
-   - 内容合成（synthesize_chunks、extract_key_info）
+2. **工具集**:
+    - 结构化数据查询（IPO、配售、供股、合股）
+    - 文档检索（search_documents、retrieve_chunks）
+    - 内容合成（synthesize_chunks、extract_key_info）
 3. **LLM Manager**: 支持多模型切换和主备策略
 4. **Layer 2 - 上下文注入**: 智能识别查询需求，自动注入时间、市场状态等上下文
 5. **Layer 3 - 数据增强**: 实时市场数据获取、数据质量评估和智能增强
@@ -264,46 +264,46 @@ sub_agents:
 
 ## 🔍 可用工具
 
-| 工具名 | 功能 | 参数 |
-|--------|------|------|
-| **数据查询工具** |
-| `query_placing_data` | 查询配售数据 | stock_code, start_date, end_date, limit |
-| `query_ipo_data` | 查询IPO数据 | stock_code, start_date, end_date, limit |
-| `query_rights_data` | 查询供股数据 | stock_code, start_date, end_date, limit |
-| `query_consolidation_data` | 查询合股数据 | stock_code, start_date, end_date, limit |
-| **文档检索工具** |
-| `search_documents` | 搜索公告文档 | stock_code, document_type, start_date, limit |
-| `retrieve_chunks` | 检索文档切块 | doc_id, stock_code, keyword, limit |
-| **内容分析工具** |
-| `synthesize_chunks` | 合成多个切块 | chunks_json |
-| `extract_key_info` | 提取关键信息 | text, info_type |
-| `compare_data` | 对比两组数据 | data1_json, data2_json, dimensions |
-| **时间感知工具** |
-| `get_current_time` | 获取当前时间 | 无 |
-| `get_market_time` | 获取市场状态 | 无 |
-| `calculate_time_diff` | 计算时间差 | date_str, format_type |
-| `format_time_period` | 格式化时间段 | start_date, end_date |
-| `get_date_info` | 获取日期信息 | date_str |
-| **Layer 3数据增强工具** |
-| `assess_data_quality` | 评估数据质量 | data_json |
-| `enhance_market_data` | 增强市场数据 | query, stock_data |
-| `get_real_time_stock_info` | 获取实时股票信息 | symbol |
-| **辅助工具** |
-| `get_document_metadata` | 获取文档元信息 | doc_id |
+| 工具名                        | 功能       | 参数                                           |
+|----------------------------|----------|----------------------------------------------|
+| **数据查询工具**                 |
+| `query_placing_data`       | 查询配售数据   | stock_code, start_date, end_date, limit      |
+| `query_ipo_data`           | 查询IPO数据  | stock_code, start_date, end_date, limit      |
+| `query_rights_data`        | 查询供股数据   | stock_code, start_date, end_date, limit      |
+| `query_consolidation_data` | 查询合股数据   | stock_code, start_date, end_date, limit      |
+| **文档检索工具**                 |
+| `search_documents`         | 搜索公告文档   | stock_code, document_type, start_date, limit |
+| `retrieve_chunks`          | 检索文档切块   | doc_id, stock_code, keyword, limit           |
+| **内容分析工具**                 |
+| `synthesize_chunks`        | 合成多个切块   | chunks_json                                  |
+| `extract_key_info`         | 提取关键信息   | text, info_type                              |
+| `compare_data`             | 对比两组数据   | data1_json, data2_json, dimensions           |
+| **时间感知工具**                 |
+| `get_current_time`         | 获取当前时间   | 无                                            |
+| `get_market_time`          | 获取市场状态   | 无                                            |
+| `calculate_time_diff`      | 计算时间差    | date_str, format_type                        |
+| `format_time_period`       | 格式化时间段   | start_date, end_date                         |
+| `get_date_info`            | 获取日期信息   | date_str                                     |
+| **Layer 3数据增强工具**          |
+| `assess_data_quality`      | 评估数据质量   | data_json                                    |
+| `enhance_market_data`      | 增强市场数据   | query, stock_data                            |
+| `get_real_time_stock_info` | 获取实时股票信息 | symbol                                       |
+| **辅助工具**                   |
+| `get_document_metadata`    | 获取文档元信息  | doc_id                                       |
 
 ## ⚙️ 配置说明
 
 ### 环境变量（.env）
 
-| 变量名 | 说明 | 默认值 |
-|--------|------|--------|
-| `SILICONFLOW_API_KEY` | 硅基流动API密钥 | 必填 |
-| `SILICONFLOW_FAST_MODEL` | 快速模型 | deepseek-ai/DeepSeek-V3 |
-| `SILICONFLOW_STRONG_MODEL` | 强模型 | Qwen/Qwen2.5-72B-Instruct |
-| `CLICKHOUSE_HOST` | ClickHouse主机 | 1.14.239.79 |
-| `CLICKHOUSE_PORT` | ClickHouse端口 | 8868 |
-| `CLICKHOUSE_DATABASE` | 数据库名 | hkex_analysis |
-| `APP_PORT` | API服务端口 | 8000 |
+| 变量名                        | 说明           | 默认值                       |
+|----------------------------|--------------|---------------------------|
+| `SILICONFLOW_API_KEY`      | 硅基流动API密钥    | 必填                        |
+| `SILICONFLOW_FAST_MODEL`   | 快速模型         | deepseek-ai/DeepSeek-V3   |
+| `SILICONFLOW_STRONG_MODEL` | 强模型          | Qwen/Qwen2.5-72B-Instruct |
+| `CLICKHOUSE_HOST`          | ClickHouse主机 | 1.14.239.79               |
+| `CLICKHOUSE_PORT`          | ClickHouse端口 | 8868                      |
+| `CLICKHOUSE_DATABASE`      | 数据库名         | hkex_analysis             |
+| `APP_PORT`                 | API服务端口      | 8000                      |
 
 ### Agent配置（config/agents.yaml）
 
@@ -342,23 +342,27 @@ hkex-agent ask "查询00700.hk最近的配售数据"
 当前实现为**Phase 1-3分层架构**，包含：
 
 **Phase 1 - 基础版本**：
+
 - ✅ Document Agent
 - ✅ 数据库工具集
 - ✅ 文档检索工具
 - ✅ API和CLI接口
 
 **Phase 2 - 上下文注入**（已实现）：
+
 - ✅ 智能查询分析
 - ✅ 时间上下文自动注入
 - ✅ 市场状态感知
 - ✅ 业务数据时效性标注
 
 **Phase 3 - 数据增强**（已完成）：
+
 - ✅ 实时市场数据获取（AkShare + Yahoo Finance双数据源）
 - ✅ 数据质量评估（完整性、准确性、时效性、一致性四维度）
 - ✅ 智能数据增强（自动降级策略，优雅失败处理）
 
 **Phase 4-5扩展功能**（架构已预留）：
+
 - ⏳ Planner模块（任务规划）
 - ⏳ Supervisor协调器（多Agent调度）
 - ⏳ Reflector模块（结果验证）

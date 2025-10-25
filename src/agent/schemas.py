@@ -1,7 +1,8 @@
 """Agent相关的Pydantic模型"""
-from pydantic import BaseModel, Field
-from typing import Literal, Optional
 from datetime import datetime
+from typing import Literal, Optional
+
+from pydantic import BaseModel, Field
 
 
 class PlanStep(BaseModel):
@@ -10,6 +11,14 @@ class PlanStep(BaseModel):
     task: str = Field(..., description="任务描述，清晰具体")
     agent: Literal["document", "market", "financial", "news"]
     params: dict = Field(default_factory=dict)
+    recommended_tools: list[str] = Field(
+        default_factory=list,
+        description="推荐使用的工具列表，帮助Agent更准确地选择工具"
+    )
+    tool_params_template: dict = Field(
+        default_factory=dict,
+        description="工具参数模板，为工具调用提供参数建议"
+    )
     depends_on: list[int] = Field(default_factory=list)
     estimated_time: Optional[float] = None
 
@@ -30,4 +39,3 @@ class UserProfile(BaseModel):
     query_history: list[dict] = Field(default_factory=list)
     last_active: datetime
     total_queries: int = 0
-

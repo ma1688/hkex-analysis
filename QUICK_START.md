@@ -84,6 +84,7 @@ You: 00328最新一份公告的名称
 ```
 
 **优势**:
+
 - 🔍 实时看到Agent在做什么
 - 🛠️ 了解调用了哪些工具
 - 📊 观察Agent的推理过程
@@ -108,20 +109,26 @@ cp .env.example .env
 ## ⚠️ 常见问题
 
 ### Q: 提示 "command not found: hkex-agent"
+
 **A**: 您需要激活虚拟环境或使用完整路径：
+
 ```bash
 source /Users/ericp/new-langgraph/.venv/bin/activate
 ```
 
 ### Q: 提示 "ModuleNotFoundError"
+
 **A**: 重新安装包：
+
 ```bash
 cd /Users/ericp/new-langgraph/hkex-analysis
 uv pip install -e .
 ```
 
 ### Q: 配置文件在哪里？
-**A**: 
+
+**A**:
+
 - 环境变量: `hkex-analysis/.env`
 - Agent配置: `hkex-analysis/config/agents.yaml`
 - 工具配置: `hkex-analysis/config/tools.yaml`

@@ -1,26 +1,27 @@
 """FastAPI主应用"""
+import asyncio
+import json
+import logging
+import time
+import uuid
+from datetime import datetime
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-import logging
-from datetime import datetime
-import uuid
-import time
+from fastapi.responses import StreamingResponse
 
-from src.config.settings import get_settings
+from src.agent.context_injector import inject_query_context
+from src.agent.document_agent import get_document_agent
+from src.agent.memory import get_memory_manager
+from src.agent.supervisor import get_supervisor
 from src.api.schemas import (
     QueryRequest, QueryResponse, HealthResponse,
-    ToolInfo, ToolCallRecord, StreamEvent, SessionHistoryResponse
+    ToolInfo, ToolCallRecord, SessionHistoryResponse
 )
-from src.agent.document_agent import get_document_agent
-from src.agent.supervisor import get_supervisor
-from src.agent.memory import get_memory_manager
-from src.agent.context_injector import inject_query_context
-from src.utils.clickhouse import get_clickhouse_manager
+from src.config.settings import get_settings
 from src.llm.manager import get_llm_manager
 from src.tools.loader import load_all_tools
-from fastapi.responses import StreamingResponse
-import json
-import asyncio
+from src.utils.clickhouse import get_clickhouse_manager
 
 # 配置日志
 logging.basicConfig(
@@ -50,11 +51,11 @@ app.add_middleware(
 @app.on_event("startup")
 async def startup_event():
     """启动时初始化"""
-    logger.info("="* 50)
+    logger.info("=" * 50)
     logger.info("HK Stock Analysis Agent API Starting...")
     logger.info(f"Environment: {settings.app_env}")
     logger.info(f"Port: {settings.app_port}")
-    logger.info("="* 50)
+    logger.info("=" * 50)
 
 
 @app.get("/")
@@ -76,7 +77,7 @@ async def query_agent(request: QueryRequest):
     """
     start_time = time.time()
     session_id = request.session_id or str(uuid.uuid4())
-    
+
     try:
         logger.info(f"收到查询: {request.question[:50]}... (session: {session_id})")
 
@@ -105,11 +106,11 @@ async def query_agent(request: QueryRequest):
             {"messages": [("user", enhanced_query)]},
             config
         )
-        
+
         # 提取答案
         messages = result.get("messages", [])
         answer = messages[-1].content if messages else "无法生成答案"
-        
+
         # 处理工具调用记录
         tool_calls = []
         for msg in messages:
@@ -122,11 +123,11 @@ async def query_agent(request: QueryRequest):
                         timestamp=datetime.now(),
                         agent="document"
                     ))
-        
+
         processing_time = time.time() - start_time
-        
+
         logger.info(f"查询完成: {processing_time:.2f}s, 工具调用{len(tool_calls)}次")
-        
+
         return QueryResponse(
             answer=answer,
             session_id=session_id,
@@ -138,7 +139,7 @@ async def query_agent(request: QueryRequest):
                 "message_count": len(messages)
             }
         )
-    
+
     except Exception as e:
         logger.error(f"查询失败: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
@@ -152,7 +153,7 @@ async def stream_query(request: QueryRequest):
     使用Server-Sent Events (SSE)流式返回Agent执行过程
     """
     session_id = request.session_id or str(uuid.uuid4())
-    
+
     async def event_generator():
         try:
             logger.info(f"流式查询开始: {request.question[:50]}... (session: {session_id})")
@@ -175,10 +176,10 @@ async def stream_query(request: QueryRequest):
                 'confidence': context_info.get("confidence", 0)
             }
             yield f"event: start\ndata: {json.dumps(start_data)}\n\n"
-            
+
             # 获取Supervisor
             supervisor = get_supervisor()
-            
+
             # 构建初始状态（dict形式，包含supervisor节点需要的所有字段）
             initial_state = {
                 # 基础字段（Supervisor实际使用的）
@@ -209,18 +210,18 @@ async def stream_query(request: QueryRequest):
                 "tool_calls": [],
                 "error_count": 0
             }
-            
+
             config = {"configurable": {"thread_id": session_id}}
-            
+
             # 流式执行
             step_count = 0
             async for event in supervisor.graph.astream(initial_state, config):
                 step_count += 1
-                
+
                 # 提取事件信息
                 node_name = list(event.keys())[0] if event else "unknown"
                 node_data = event.get(node_name, {})
-                
+
                 # 发送步骤事件
                 stream_event = {
                     "event": "step",
@@ -231,7 +232,7 @@ async def stream_query(request: QueryRequest):
                     }
                 }
                 yield f"event: step\ndata: {json.dumps(stream_event)}\n\n"
-                
+
                 # 如果是计划节点，发送计划
                 if node_name == "plan" and "plan" in node_data:
                     plan_event = {
@@ -239,7 +240,7 @@ async def stream_query(request: QueryRequest):
                         "data": {"plan": str(node_data.get("plan", {}))}
                     }
                     yield f"event: plan\ndata: {json.dumps(plan_event)}\n\n"
-                
+
                 # 如果是执行节点，发送进度
                 if node_name in ["execute_document"]:
                     progress_event = {
@@ -250,7 +251,7 @@ async def stream_query(request: QueryRequest):
                         }
                     }
                     yield f"event: progress\ndata: {json.dumps(progress_event)}\n\n"
-                
+
                 # 如果是反思节点，发送反思结果
                 if node_name == "reflect" and "reflection" in node_data:
                     reflection_event = {
@@ -258,14 +259,14 @@ async def stream_query(request: QueryRequest):
                         "data": {"reflection": str(node_data.get("reflection", {}))}
                     }
                     yield f"event: reflection\ndata: {json.dumps(reflection_event)}\n\n"
-                
+
                 # 等待一小段时间，确保客户端能接收
                 await asyncio.sleep(0.01)
-            
+
             # 获取最终结果
             final_state = event.get(list(event.keys())[0], {}) if event else {}
             final_answer = final_state.get("final_answer", "无法生成答案")
-            
+
             # 发送最终答案
             answer_event = {
                 "event": "answer",
@@ -276,12 +277,12 @@ async def stream_query(request: QueryRequest):
                 }
             }
             yield f"event: answer\ndata: {json.dumps(answer_event)}\n\n"
-            
+
             # 发送完成事件
             yield f"event: done\ndata: {json.dumps({'status': 'completed'})}\n\n"
-            
+
             logger.info(f"流式查询完成: {step_count}步")
-            
+
         except Exception as e:
             logger.error(f"流式查询失败: {e}", exc_info=True)
             error_event = {
@@ -289,7 +290,7 @@ async def stream_query(request: QueryRequest):
                 "data": {"error": str(e)}
             }
             yield f"event: error\ndata: {json.dumps(error_event)}\n\n"
-    
+
     return StreamingResponse(
         event_generator(),
         media_type="text/event-stream",
@@ -303,9 +304,9 @@ async def stream_query(request: QueryRequest):
 
 @app.get("/api/v1/sessions/{session_id}/history", response_model=SessionHistoryResponse)
 async def get_session_history(
-    session_id: str,
-    limit: int = 50,
-    offset: int = 0
+        session_id: str,
+        limit: int = 50,
+        offset: int = 0
 ):
     """
     获取会话历史
@@ -314,19 +315,19 @@ async def get_session_history(
     """
     try:
         logger.info(f"获取会话历史: {session_id}, limit={limit}, offset={offset}")
-        
+
         # 获取Memory Manager
         memory_manager = get_memory_manager()
-        
+
         # 获取消息历史
         all_messages = memory_manager.get_messages(session_id)
-        
+
         # 应用分页
         total = len(all_messages)
         start = offset
         end = offset + limit
         messages = all_messages[start:end]
-        
+
         # 转换消息格式
         formatted_messages = []
         for msg in messages:
@@ -335,10 +336,10 @@ async def get_session_history(
                 "content": msg.content,
                 "timestamp": datetime.now().isoformat()  # 简化版，实际应从消息中获取
             })
-        
+
         # 获取会话元数据
         metadata = memory_manager.get_session_metadata(session_id) or {}
-        
+
         return SessionHistoryResponse(
             session_id=session_id,
             messages=formatted_messages,
@@ -347,7 +348,7 @@ async def get_session_history(
             limit=limit,
             metadata=metadata
         )
-    
+
     except Exception as e:
         logger.error(f"获取会话历史失败: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
@@ -358,7 +359,7 @@ async def health_check():
     """健康检查"""
     services = {}
     overall_status = "healthy"
-    
+
     # 检查ClickHouse
     try:
         ch_manager = get_clickhouse_manager()
@@ -370,20 +371,20 @@ async def health_check():
     except Exception as e:
         services["clickhouse"] = f"unhealthy: {str(e)[:30]}"
         overall_status = "degraded"
-    
+
     # 检查LLM
     try:
         llm_manager = get_llm_manager()
         llm_health = llm_manager.check_health()
         services.update(llm_health)
-        
+
         # 如果有任何LLM不健康，降级状态
         if any("unhealthy" in v for v in llm_health.values()):
             overall_status = "degraded"
     except Exception as e:
         services["llm"] = f"unhealthy: {str(e)[:30]}"
         overall_status = "degraded"
-    
+
     return HealthResponse(
         status=overall_status,
         services=services,
@@ -397,7 +398,7 @@ async def list_tools():
     """列出所有可用工具"""
     try:
         all_tools = load_all_tools()
-        
+
         tools_info = []
         for tool in all_tools:
             tools_info.append(ToolInfo(
@@ -407,7 +408,7 @@ async def list_tools():
                 agent="document",
                 enabled=True
             ))
-        
+
         return {
             "tools": tools_info,
             "total": len(tools_info)
@@ -419,5 +420,5 @@ async def list_tools():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=settings.app_port)
 
+    uvicorn.run(app, host=settings.app_host, port=settings.app_port)

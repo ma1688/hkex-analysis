@@ -1,8 +1,8 @@
 """时间工具集 - 为Agent提供时间感知能力"""
-from datetime import datetime, timezone, timedelta
-from typing import Optional, Dict, Any
-import pytz
 import logging
+from datetime import datetime
+
+import pytz
 from langchain_core.tools import tool
 
 logger = logging.getLogger(__name__)
@@ -12,19 +12,23 @@ HONGKONG_TZ = pytz.timezone('Asia/Hong_Kong')
 
 # 港股交易时间
 MARKET_HOURS = {
-    'morning_start': (9, 30),    # 上午9:30开盘
-    'morning_end': (12, 0),      # 中午12:00休市
+    'morning_start': (9, 30),  # 上午9:30开盘
+    'morning_end': (12, 0),  # 中午12:00休市
     'afternoon_start': (13, 0),  # 下午1:00开盘
-    'afternoon_end': (16, 0),    # 下午4:00收盘
+    'afternoon_end': (16, 0),  # 下午4:00收盘
 }
+
 
 @tool
 def get_current_time() -> str:
-    """
-    获取当前时间（香港时间）
-
-    Returns:
-        str: 当前香港时间的自然语言描述，如"2025年10月25日 下午3:15 (星期六)"
+    """获取当前时间（香港时间）
+    
+    【适用场景】
+    - 需要确认当前日期和时间
+    - 分析"最近""今天""本周"等相对时间概念
+    - 判断公告发布的时效性
+    
+    【返回】当前香港时间的自然语言描述，如"2025年10月25日 下午3:15 (星期六)"
     """
     try:
         # 获取香港时间
@@ -56,13 +60,18 @@ def get_current_time() -> str:
         logger.error(f"获取当前时间失败: {e}")
         return "抱歉，无法获取当前时间"
 
+
 @tool
 def get_market_time() -> str:
-    """
-    获取港股市场当前状态和时间
-
-    Returns:
-        str: 港股市场状态描述，如"目前是交易时间，上午10:15，市场开盘"
+    """获取港股市场当前状态和时间
+    
+    【适用场景】
+    - 判断当前是否为交易时间
+    - 解释股价是否会实时变动
+    - 提供市场开盘/休市状态
+    
+    【交易时间】上午9:30-12:00，下午1:00-4:00，周末休市
+    【返回】港股市场状态描述，如"目前是交易时间，上午10:15，市场开盘"
     """
     try:
         now_hk = datetime.now(HONGKONG_TZ)
@@ -95,17 +104,25 @@ def get_market_time() -> str:
         logger.error(f"获取市场时间失败: {e}")
         return "抱歉，无法获取市场时间信息"
 
+
 @tool
 def calculate_time_diff(date_str: str, format_type: str = "natural") -> str:
-    """
-    计算给定日期与当前时间的差值
+    """计算给定日期与当前时间的差值
+    
+    【适用场景】
+    - 计算公告发布距今多长时间
+    - 判断数据是否过时
+    - 分析事件的时间跨度
+    
+    【支持格式】YYYY-MM-DD, YYYY-MM-DD HH:MM等
+    【返回】时间差描述，如"该日期是3天前"、"该日期在5天后"
 
     Args:
         date_str: 日期字符串，格式如"2025-10-25", "2025-10-25 14:30"等
         format_type: 输出格式，"natural"(自然语言)或"days"(天数)
 
     Returns:
-        str: 时间差描述，如"该日期是3天前"、"距今10天"
+        str: 时间差描述
     """
     try:
         # 尝试解析日期
@@ -177,13 +194,20 @@ def calculate_time_diff(date_str: str, format_type: str = "natural") -> str:
         logger.error(f"计算时间差失败: {e}")
         return "抱歉，无法计算时间差"
 
+
 @tool
 def format_time_period(start_date: str, end_date: str = None) -> str:
-    """
-    格式化时间段描述
+    """格式化时间段描述
+    
+    【适用场景】
+    - 描述事件的持续时间
+    - 计算供股、配售等的时间跨度
+    - 格式化数据查询的时间范围
+    
+    【返回】如"从2024年1月1日到2024年12月31日，持续12个月"
 
     Args:
-        start_date: 开始日期
+        start_date: 开始日期（YYYY-MM-DD）
         end_date: 结束日期（可选，默认为当前时间）
 
     Returns:
@@ -260,16 +284,24 @@ def format_time_period(start_date: str, end_date: str = None) -> str:
         logger.error(f"格式化时间段失败: {e}")
         return "抱歉，无法格式化时间段"
 
+
 @tool
 def get_date_info(date_str: str = None) -> str:
-    """
-    获取指定日期或当前日期的详细信息
+    """获取指定日期或当前日期的详细信息
+    
+    【适用场景】
+    - 判断某日期是否为交易日
+    - 检查是否为周末或节假日
+    - 获取日期的详细属性（星期几、是否休市等）
+    
+    【返回】如"2024年1月15日 星期一，港股交易日"
+    【包含】星期、是否为周末/节假日、是否为港股交易日
 
     Args:
-        date_str: 日期字符串（可选），不提供则返回当前日期信息
+        date_str: 日期字符串（YYYY-MM-DD，可选），不提供则返回当前日期信息
 
     Returns:
-        str: 日期详细信息，包括星期、节假日等
+        str: 日期详细信息，包括星期、节假日、交易日判断等
     """
     try:
         if date_str:
@@ -305,16 +337,16 @@ def get_date_info(date_str: str = None) -> str:
 
         # 香港主要节假日（简化版）
         holidays = [
-            (1, 1),   # 元旦
+            (1, 1),  # 元旦
             (2, 10),  # 春节（示例，实际按农历计算）
             (2, 11),  # 春节
             (2, 12),  # 春节
-            (4, 4),   # 清明节
-            (5, 1),   # 劳动节
-            (7, 1),   # 香港回归纪念日
+            (4, 4),  # 清明节
+            (5, 1),  # 劳动节
+            (7, 1),  # 香港回归纪念日
             (10, 1),  # 国庆节
-            (12, 25), # 圣诞节
-            (12, 26), # 节礼日
+            (12, 25),  # 圣诞节
+            (12, 26),  # 节礼日
         ]
 
         if (month, day) in holidays:

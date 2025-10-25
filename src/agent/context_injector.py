@@ -1,14 +1,16 @@
 """上下文自动注入系统 - Layer 2"""
-import re
+import asyncio
 import logging
+import re
 from datetime import datetime
 from typing import Dict, List, Optional, Tuple
+
 import pytz
-import asyncio
 
 # Layer 3数据增强导入
 try:
     from .data_enhancer import enhance_query_data, EnhancedData
+
     LAYER_3_AVAILABLE = True
 except ImportError:
     LAYER_3_AVAILABLE = False
@@ -355,9 +357,9 @@ class ContextInjector:
                 elif age_hours < 24:
                     age_desc = f"{age_hours:.0f}小时内"
                 elif age_hours < 24 * 7:
-                    age_desc = f"{age_hours/24:.0f}天内"
+                    age_desc = f"{age_hours / 24:.0f}天内"
                 else:
-                    age_desc = f"{age_hours/(24*7):.0f}周内"
+                    age_desc = f"{age_hours / (24 * 7):.0f}周内"
                 summary_parts.append(f"数据时效{age_desc}")
 
         return "；".join(summary_parts) if summary_parts else "数据已增强"

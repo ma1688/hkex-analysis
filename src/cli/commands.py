@@ -1,19 +1,17 @@
 """CLI命令 - 使用Typer实现"""
-import typer
-from rich.console import Console
-from rich.table import Table
-from rich.panel import Panel
-from rich.live import Live
-from rich.text import Text
-from rich import print as rprint
+import asyncio
 import logging
 import uuid
-import asyncio
 
-from src.agent.document_agent import get_document_agent
+import typer
+from rich.console import Console
+from rich.panel import Panel
+from rich.table import Table
+
 from src.agent.context_injector import inject_query_context
-from src.tools.loader import load_all_tools
+from src.agent.document_agent import get_document_agent
 from src.config.settings import get_settings
+from src.tools.loader import load_all_tools
 from src.utils.text_cleaner import clean_text
 
 # 创建CLI应用
@@ -38,34 +36,32 @@ async def stream_agent_with_display(agent, question: str, config: dict, console:
     Returns:
         最终答案
     """
-    import sys
     import time
-    from rich.spinner import Spinner
-    from rich.live import Live
-    
+
     final_answer = None
     step_count = 0
     last_update = time.time()
-    
+
     # 创建输入（清理问题中的无效字符）
     clean_question = clean_text(question)
     input_data = {"messages": [("user", clean_question)]}
-    
+
     # 流式执行 - 实时展示
     try:
         event_count = 0
         thinking_start = time.time()  # 记录开始时间
-        
+
         from rich.spinner import Spinner
         from rich import box
         import sys
-        
+
         # 使用Rich的spinner来显示动态进度
         mode_hint = "详细模式" if detailed else "简洁模式"
-        
+
         # 初始显示
         elapsed_time = 0
-        with console.status(f"[bold green]⏳ Agent思考中... [cyan]{elapsed_time:.1f}s[/cyan] [dim]({mode_hint})[/dim]", spinner="dots") as status:
+        with console.status(f"[bold green]⏳ Agent思考中... [cyan]{elapsed_time:.1f}s[/cyan] [dim]({mode_hint})[/dim]",
+                            spinner="dots") as status:
 
             # 创建后台时间更新任务
             update_interval = 0.5  # 每0.5秒更新一次时间
@@ -111,7 +107,8 @@ async def stream_agent_with_display(agent, question: str, config: dict, console:
 
                         # 停止spinner，打印详细内容，然后继续
                         status.stop()
-                        console.print(f"[dim cyan]{node_symbol} 步骤{step_count}: {key}[/dim cyan] [cyan]总计{total_elapsed:.1f}s[/cyan] [dim](+{elapsed})[/dim]")
+                        console.print(
+                            f"[dim cyan]{node_symbol} 步骤{step_count}: {key}[/dim cyan] [cyan]总计{total_elapsed:.1f}s[/cyan] [dim](+{elapsed})[/dim]")
 
                         # 打印消息详情
                         if isinstance(value, dict) and "messages" in value:
@@ -154,7 +151,8 @@ async def stream_agent_with_display(agent, question: str, config: dict, console:
                                 # 检查是否是工具消息
                                 elif hasattr(last_message, 'name'):
                                     tool_name = last_message.name if hasattr(last_message, 'name') else 'tool'
-                                    content = clean_text(last_message.content) if hasattr(last_message, 'content') else ''
+                                    content = clean_text(last_message.content) if hasattr(last_message,
+                                                                                          'content') else ''
 
                                     if detailed:
                                         preview = content[:200].replace('\n', ' ')
@@ -176,7 +174,7 @@ async def stream_agent_with_display(agent, question: str, config: dict, console:
                     await time_update_task
                 except asyncio.CancelledError:
                     pass
-        
+
         # 获取最终答案
         if event:
             for key, value in event.items():
@@ -184,17 +182,17 @@ async def stream_agent_with_display(agent, question: str, config: dict, console:
                     messages = value.get("messages", [])
                     if messages:
                         final_answer = messages[-1].content if hasattr(messages[-1], 'content') else "无法生成答案"
-        
+
         final_answer = clean_text(final_answer) if final_answer else "无法生成答案"
-        
+
         # 计算总耗时
         total_time = time.time() - thinking_start
-        
+
         # 显示完成标记（包含总时间）
         console.print(f"[dim]✨ 完成！共 {step_count} 个节点，总耗时 [cyan]{total_time:.1f}s[/cyan][/dim]")
-        
+
         return final_answer
-        
+
     except Exception as e:
         import traceback
         console.print(f"[bold red]流式执行错误: {e}[/bold red]")
@@ -205,11 +203,11 @@ async def stream_agent_with_display(agent, question: str, config: dict, console:
 def run_agent_stream(agent, question: str, config: dict, console: Console, detailed: bool = False):
     """运行流式Agent（同步包装）- 优化版避免卡顿"""
     import asyncio
-    
+
     # 创建新的事件循环（避免冲突）
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
-    
+
     try:
         # 运行异步函数
         result = loop.run_until_complete(
@@ -239,10 +237,10 @@ def run_agent_stream(agent, question: str, config: dict, console: Console, detai
 
 @app.command()
 def ask(
-    question: str = typer.Argument(..., help="要询问的问题"),
-    session: str = typer.Option(None, "--session", "-s", help="会话ID（可选）"),
-    show_thoughts: bool = typer.Option(True, "--thoughts/--no-thoughts", help="是否显示思考过程"),
-    detailed: bool = typer.Option(False, "--detailed", "-d", help="详细模式（显示完整内容）")
+        question: str = typer.Argument(..., help="要询问的问题"),
+        session: str = typer.Option(None, "--session", "-s", help="会话ID（可选）"),
+        show_thoughts: bool = typer.Option(True, "--thoughts/--no-thoughts", help="是否显示思考过程"),
+        detailed: bool = typer.Option(False, "--detailed", "-d", help="详细模式（显示完整内容）")
 ):
     """
     单次问答
@@ -263,8 +261,11 @@ def ask(
 
         # 获取并显示模型信息
         from src.agent.document_agent import load_agent_config
+        from src.config.settings import get_settings
+        settings = get_settings()
         agent_config = load_agent_config("document")
-        model_name = agent_config.get("model", "unknown")
+        # 优先使用 Settings 中的模型（与 document_agent.py 逻辑一致）
+        model_name = agent_config.get("model") or settings.siliconflow_fast_model
         temperature = agent_config.get("temperature", 0.1)
 
         # 获取Agent
@@ -283,11 +284,11 @@ def ask(
 
         console.print(f"\n[bold cyan]问题:[/bold cyan] {question}")
         console.print(f"[dim]📍 模型: [cyan]{model_name}[/cyan] (温度: {temperature})[/dim]\n")
-        
+
         if show_thoughts:
             # 实时流式展示思考过程（使用增强后的查询）
             answer = run_agent_stream(agent, enhanced_query, config, console, detailed)
-            
+
             # 显示答案
             console.print()  # 空行
             console.print(Panel(
@@ -302,19 +303,19 @@ def ask(
                     {"messages": [("user", enhanced_query)]},
                     config
                 )
-                
+
                 # 提取答案
                 messages = result.get("messages", [])
                 answer = messages[-1].content if messages else "无法生成答案"
                 # 清理可能的无效字符
                 answer = clean_text(answer)
-            
+
             # 显示结果
             console.print("[bold green]回答:[/bold green]")
             console.print(answer)
-        
+
         console.print(f"\n[dim]会话ID: {session_id}[/dim]")
-        
+
     except Exception as e:
         console.print(f"[bold red]错误:[/bold red] {e}")
         raise typer.Exit(code=1)
@@ -322,8 +323,8 @@ def ask(
 
 @app.command()
 def chat(
-    show_thoughts: bool = typer.Option(True, "--thoughts/--no-thoughts", help="是否显示思考过程"),
-    detailed: bool = typer.Option(False, "--detailed", "-d", help="详细模式（显示完整内容）")
+        show_thoughts: bool = typer.Option(True, "--thoughts/--no-thoughts", help="是否显示思考过程"),
+        detailed: bool = typer.Option(False, "--detailed", "-d", help="详细模式（显示完整内容）")
 ):
     """
     交互式对话
@@ -335,21 +336,24 @@ def chat(
     """
     # 获取并显示模型信息
     from src.agent.document_agent import load_agent_config
+    from src.config.settings import get_settings
+    settings = get_settings()
     agent_config = load_agent_config("document")
-    model_name = agent_config.get("model", "unknown")
+    # 优先使用 Settings 中的模型（与 document_agent.py 逻辑一致）
+    model_name = agent_config.get("model") or settings.siliconflow_fast_model
     temperature = agent_config.get("temperature", 0.1)
-    
+
     session_id = str(uuid.uuid4())
     console.print(f"[bold green]开始对话[/bold green] (会话ID: {session_id})")
     console.print(f"[dim]📍 模型: [cyan]{model_name}[/cyan] (温度: {temperature})[/dim]")
     console.print("[dim]输入 'exit' 或 'quit' 退出[/dim]")
-    
+
     if show_thoughts:
         mode_desc = "详细模式" if detailed else "简洁模式"
         console.print(f"[dim]💡 提示: 思考过程展示已启用 ({mode_desc})[/dim]\n")
     else:
         console.print("[dim]💡 提示: 使用 --thoughts 可查看思考过程[/dim]\n")
-    
+
     try:
         agent = get_document_agent()
         config = {
@@ -358,7 +362,7 @@ def chat(
             },
             "recursion_limit": 50  # 增加递归限制（默认25）
         }
-        
+
         while True:
             # 获取用户输入
             question = console.input("\n[bold cyan]You:[/bold cyan] ")
@@ -405,7 +409,7 @@ def chat(
 
                 # 显示答案
                 console.print(f"\n[bold green]Agent:[/bold green] {answer}\n")
-    
+
     except KeyboardInterrupt:
         console.print("\n[bold yellow]对话中断[/bold yellow]")
     except Exception as e:
@@ -423,18 +427,18 @@ def tools_list():
     """
     try:
         tools = load_all_tools()
-        
+
         # 创建表格
         table = Table(title="可用工具列表")
         table.add_column("工具名", style="cyan", no_wrap=True)
         table.add_column("描述", style="magenta")
-        
+
         for tool in tools:
             table.add_row(tool.name, tool.description)
-        
+
         console.print(table)
         console.print(f"\n[dim]共 {len(tools)} 个工具[/dim]")
-    
+
     except Exception as e:
         console.print(f"[bold red]错误:[/bold red] {e}")
         raise typer.Exit(code=1)
@@ -450,11 +454,11 @@ def show_config():
     """
     try:
         settings = get_settings()
-        
+
         table = Table(title="当前配置")
         table.add_column("配置项", style="cyan")
         table.add_column("值", style="green")
-        
+
         table.add_row("环境", settings.app_env)
         table.add_row("端口", str(settings.app_port))
         table.add_row("日志级别", settings.app_log_level)
@@ -462,9 +466,9 @@ def show_config():
         table.add_row("ClickHouse DB", settings.clickhouse_database)
         table.add_row("快速模型", settings.siliconflow_fast_model)
         table.add_row("强模型", settings.siliconflow_strong_model)
-        
+
         console.print(table)
-    
+
     except Exception as e:
         console.print(f"[bold red]错误:[/bold red] {e}")
         raise typer.Exit(code=1)
@@ -480,4 +484,3 @@ def version():
 
 if __name__ == "__main__":
     app()
-

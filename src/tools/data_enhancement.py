@@ -1,24 +1,34 @@
 """数据增强工具 - Layer 3演示"""
 import logging
-from typing import Dict, Any, Optional
+
 from langchain_core.tools import tool
 
-from src.agent.data_enhancer import enhance_query_data, get_data_enhancer
+from src.agent.data_enhancer import get_data_enhancer
 
 logger = logging.getLogger(__name__)
 
 
 @tool
 def enhance_market_data(query: str, stock_data: str = "") -> str:
-    """
-    增强市场数据（Layer 3演示工具）
+    """增强市场数据（通过外部API获取补充信息）
+    
+    【适用场景】
+    - 需要股票的实时市场数据补充
+    - 查询IPO/配售后需要当前股价对比
+    - 评估配售折让率、供股价是否合理
+    
+    【不适用场景】
+    - 只需要历史公告数据 → 使用结构化查询工具
+    - 基本信息查询 → query_*_data工具已足够
+    
+    【注意】此工具会调用外部API，可能较慢，仅在必要时使用
 
     Args:
         query: 原始用户查询
         stock_data: 股票相关数据（JSON格式字符串）
 
     Returns:
-        增强后的数据摘要
+        增强后的数据摘要，包含市场数据和质量评估
     """
     try:
         import asyncio
@@ -56,14 +66,27 @@ def enhance_market_data(query: str, stock_data: str = "") -> str:
 
 @tool
 def get_real_time_stock_info(symbol: str) -> str:
-    """
-    获取实时股票信息（Layer 3演示工具）
+    """获取实时股票信息（通过外部API）
+    
+    【适用场景】
+    - 需要当前股价、涨跌幅等实时市场数据
+    - 对比配售价/供股价与当前价的差距
+    - 判断当前市场状态（开盘/休市）
+    
+    【不适用场景】
+    - 只需要公告中的历史数据
+    - 需要详细的K线数据（本工具只提供基本报价）
+    
+    【注意】
+    - 会调用外部API，可能较慢或受限流影响
+    - 非交易时段返回最近收盘价
+    - 包含数据质量评估和降级提示
 
     Args:
-        symbol: 股票代码，如 '00700.HK' 或 'TSLA'
+        symbol: 股票代码，如 '00700.HK'（港股）或 'TSLA'（美股）
 
     Returns:
-        股票信息摘要
+        股票信息摘要，包含价格、涨跌、数据源、市场状态等
     """
     try:
         import asyncio
@@ -159,14 +182,27 @@ def get_real_time_stock_info(symbol: str) -> str:
 
 @tool
 def assess_data_quality(data_json: str) -> str:
-    """
-    评估数据质量（Layer 3演示工具）
+    """评估数据质量（完整性、准确性、时效性、一致性）
+    
+    【适用场景】
+    - 判断查询结果的可信度
+    - 评估数据是否完整或存在缺失
+    - 识别数据中的潜在问题
+    - 提供数据改进建议
+    
+    【评估维度】
+    - 完整性：字段是否齐全
+    - 准确性：数据是否合理
+    - 时效性：数据是否过时
+    - 一致性：数据是否矛盾
+    
+    【返回】包含质量评分、发现的问题和改进建议
 
     Args:
         data_json: 要评估的数据（JSON格式字符串）
 
     Returns:
-        数据质量评估报告
+        数据质量评估报告，包含总体评分、各项细分评分、问题和建议
     """
     try:
         import asyncio
@@ -191,8 +227,8 @@ def assess_data_quality(data_json: str) -> str:
 
             # 总体评分
             score_desc = "优秀" if quality.score >= 0.8 else \
-                        "良好" if quality.score >= 0.6 else \
-                        "一般" if quality.score >= 0.4 else "较差"
+                "良好" if quality.score >= 0.6 else \
+                    "一般" if quality.score >= 0.4 else "较差"
             report_parts.append(f"总体质量: {score_desc} ({quality.score:.2f})")
 
             # 各项评分

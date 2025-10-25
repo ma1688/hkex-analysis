@@ -1,13 +1,13 @@
 """数据增强器 - Layer 3"""
-import logging
 import asyncio
-import httpx
-from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Any, Tuple
-import pytz
-from dataclasses import dataclass
-import json
+import logging
 import re
+from dataclasses import dataclass
+from datetime import datetime
+from typing import Dict, List, Optional, Any
+
+import httpx
+import pytz
 
 from src.config.settings import get_settings
 from src.utils.clickhouse import get_clickhouse_manager
@@ -142,9 +142,9 @@ class DataEnhancer:
         # 从查询中提取
         query_patterns = [
             r'(\d{5})\.hk',  # 00700.hk
-            r'(\d{5})',      # 00700
+            r'(\d{5})',  # 00700
             r'[A-Z]{1,5}\.HK',  # TCEHY.HK
-            r'[A-Z]{1,5}',   # AAPL
+            r'[A-Z]{1,5}',  # AAPL
         ]
 
         for pattern in query_patterns:
@@ -464,9 +464,9 @@ class DataEnhancer:
 
         # 计算总体质量分数
         overall_score = (completeness_score * 0.3 +
-                        accuracy_score * 0.3 +
-                        timeliness_score * 0.2 +
-                        consistency_score * 0.2)
+                         accuracy_score * 0.3 +
+                         timeliness_score * 0.2 +
+                         consistency_score * 0.2)
 
         # 识别问题
         issues = []
@@ -508,7 +508,7 @@ class DataEnhancer:
             return 0.0
 
         non_empty_fields = sum(1 for value in data.values()
-                              if value is not None and value != "" and value != 0)
+                               if value is not None and value != "" and value != 0)
 
         return non_empty_fields / total_fields
 
@@ -756,9 +756,9 @@ class DataEnhancer:
                 elif age_hours < 24:
                     age_desc = f"{age_hours:.1f}小时前"
                 elif age_hours < 24 * 7:
-                    age_desc = f"{age_hours/24:.1f}天前"
+                    age_desc = f"{age_hours / 24:.1f}天前"
                 else:
-                    age_desc = f"{age_hours/(24*7):.1f}周前"
+                    age_desc = f"{age_hours / (24 * 7):.1f}周前"
                 summary_parts.append(f"数据时效: {age_desc}")
 
         return " | ".join(summary_parts) if summary_parts else "数据增强完成"

@@ -994,18 +994,18 @@ graph TB
 
 ### 10.1 架构决策记录 (ADR)
 
-| 决策点 | 选择 | 理由 | 替代方案 |
-|--------|------|------|----------|
-| Agent框架 | LangGraph | 状态机清晰、可视化好、易调试 | LangChain Agents (太简单) |
-| Agent模式 | ReAct | 支持工具调用、推理透明 | Plan-and-Execute (过于复杂) |
-| API框架 | FastAPI | 异步、高性能、文档自动生成 | Flask (不支持异步) |
-| CLI框架 | Typer + Rich | 类型安全、终端美化 | Click (功能较少) |
-| 数据库 | ClickHouse | 列式存储、向量检索、OLAP | PostgreSQL (性能较差) |
-| LLM提供商 | SiliconFlow | 性价比高、中文支持好 | 直接OpenAI (成本高) |
-| 配置管理 | YAML + Pydantic Settings | 外部化、类型安全 | 硬编码 (不灵活) |
-| 工具加载 | 插件化自动扫描 | 可扩展、零侵入 | 手动注册 (易遗漏) |
-| 状态管理 | LangGraph Checkpointer | 会话持久化、可恢复 | 内存 (无持久化) |
-| 重试机制 | Tenacity装饰器 | 声明式、易配置 | 手动try-except (代码冗余) |
+| 决策点     | 选择                       | 理由             | 替代方案                    |
+|---------|--------------------------|----------------|-------------------------|
+| Agent框架 | LangGraph                | 状态机清晰、可视化好、易调试 | LangChain Agents (太简单)  |
+| Agent模式 | ReAct                    | 支持工具调用、推理透明    | Plan-and-Execute (过于复杂) |
+| API框架   | FastAPI                  | 异步、高性能、文档自动生成  | Flask (不支持异步)           |
+| CLI框架   | Typer + Rich             | 类型安全、终端美化      | Click (功能较少)            |
+| 数据库     | ClickHouse               | 列式存储、向量检索、OLAP | PostgreSQL (性能较差)       |
+| LLM提供商  | SiliconFlow              | 性价比高、中文支持好     | 直接OpenAI (成本高)          |
+| 配置管理    | YAML + Pydantic Settings | 外部化、类型安全       | 硬编码 (不灵活)               |
+| 工具加载    | 插件化自动扫描                  | 可扩展、零侵入        | 手动注册 (易遗漏)              |
+| 状态管理    | LangGraph Checkpointer   | 会话持久化、可恢复      | 内存 (无持久化)               |
+| 重试机制    | Tenacity装饰器              | 声明式、易配置        | 手动try-except (代码冗余)     |
 
 ### 10.2 性能优化策略
 
@@ -1113,6 +1113,7 @@ graph TB
 ### 工具
 
 所有图表使用 **Mermaid** 语法绘制，可在以下环境查看：
+
 - GitHub/GitLab (原生支持)
 - VS Code (Markdown Preview Mermaid插件)
 - Notion/Obsidian (支持Mermaid)
@@ -1122,8 +1123,8 @@ graph TB
 
 ## 🔄 更新日志
 
-| 日期 | 版本 | 更新内容 |
-|------|------|----------|
+| 日期         | 版本   | 更新内容       |
+|------------|------|------------|
 | 2025-10-24 | v1.0 | 初始版本，完整架构图 |
 
 ---
