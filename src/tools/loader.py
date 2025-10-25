@@ -61,7 +61,8 @@ class ToolLoader:
         builtin_modules = [
             "src.tools.structured_data",
             "src.tools.document_retrieval",
-            "src.tools.synthesis"
+            "src.tools.synthesis",
+            "src.tools.time_utils"
         ]
         
         for module_name in builtin_modules:

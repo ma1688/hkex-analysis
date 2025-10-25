@@ -25,6 +25,12 @@ sub_agents:
       - query_consolidation_data
       - synthesize_chunks
       - extract_key_info
+      # 时间感知工具
+      - get_current_time
+      - get_market_time
+      - calculate_time_diff
+      - format_time_period
+      - get_date_info
     system_prompt_template: "document_agent"
   
   market:
