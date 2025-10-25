@@ -379,7 +379,7 @@ def get_context_injector() -> ContextInjector:
 
 def inject_query_context(query: str, user_id: Optional[str] = None) -> Tuple[str, Dict]:
     """
-    快捷函数：为查询注入上下文
+    快捷函数：为查询注入上下文（同步版本）
 
     Args:
         query: 用户查询
@@ -390,3 +390,20 @@ def inject_query_context(query: str, user_id: Optional[str] = None) -> Tuple[str
     """
     injector = get_context_injector()
     return injector.inject_context(query, user_id)
+
+
+async def inject_query_context_async(query: str, user_id: Optional[str] = None) -> Tuple[str, Dict]:
+    """
+    快捷函数：为查询注入上下文（异步版本）
+    
+    用于在已有事件循环中调用（如FastAPI端点）
+
+    Args:
+        query: 用户查询
+        user_id: 用户ID（可选）
+
+    Returns:
+        增强后的查询和上下文信息
+    """
+    injector = get_context_injector()
+    return await injector.inject_context_async(query, user_id, None)

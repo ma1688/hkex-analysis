@@ -10,7 +10,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 
-from src.agent.context_injector import inject_query_context
+from src.agent.context_injector import inject_query_context_async
 from src.agent.document_agent import get_document_agent
 from src.agent.memory import get_memory_manager
 from src.agent.supervisor import get_supervisor
@@ -82,7 +82,7 @@ async def query_agent(request: QueryRequest):
         logger.info(f"收到查询: {request.question[:50]}... (session: {session_id})")
 
         # 上下文注入 - Layer 2
-        enhanced_query, context_info = inject_query_context(
+        enhanced_query, context_info = await inject_query_context_async(
             request.question,
             request.user_id
         )
@@ -159,7 +159,7 @@ async def stream_query(request: QueryRequest):
             logger.info(f"流式查询开始: {request.question[:50]}... (session: {session_id})")
 
             # 上下文注入 - Layer 2
-            enhanced_query, context_info = inject_query_context(
+            enhanced_query, context_info = await inject_query_context_async(
                 request.question,
                 request.user_id
             )

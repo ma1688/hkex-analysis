@@ -21,10 +21,18 @@ cp .env.example .env
 # 启动API服务
 uvicorn src.api.main:app --reload --port 8000
 
-# 使用CLI（推荐方式）
+# 使用CLI v2（推荐方式 - 全新架构）
 source .venv/bin/activate  # 或使用完整路径
-hkex-agent chat            # 交互式对话
-hkex-agent ask "查询问题"  # 单次问答
+hkex-agent chat                         # 交互式对话（带历史记录）
+hkex-agent ask "查询问题"                # 单次问答
+hkex-agent ask "问题" --no-thoughts     # 不显示思考过程
+hkex-agent ask "问题" -d                # 详细模式
+hkex-agent tools-list                   # 查看所有工具
+hkex-agent config                       # 查看当前配置
+hkex-agent version                      # 查看版本信息
+
+# 使用旧CLI（如需回退）
+hkex-agent-old chat                     # 旧版本入口
 ```
 
 ### 测试命令
@@ -56,6 +64,12 @@ src/
 ├── agent/           # Agent模块（supervisor, document_agent, planner等）
 ├── api/             # FastAPI REST API
 ├── cli/             # CLI命令行工具
+│   ├── v2/          # CLI v2 - 全新架构（推荐）
+│   │   ├── commands/    # Click命令（ask, chat, tools, config）
+│   │   ├── services/    # 服务层（agent_service, context_service）
+│   │   ├── presenters/  # 展示层（stream_presenter, table_presenter）
+│   │   └── app.py       # 主入口
+│   └── commands.py  # CLI v1 - 旧实现（已备份）
 ├── tools/           # 工具集（structured_data, document_retrieval等）
 ├── llm/             # LLM多提供商管理
 ├── config/          # 配置管理
