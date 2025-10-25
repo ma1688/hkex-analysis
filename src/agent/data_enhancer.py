@@ -71,19 +71,38 @@ class DataEnhancer:
         self.market_data_cache = {}
         self.cache_ttl = 300  # 5分钟缓存
 
+        # 请求限流 - 针对429错误优化
+        self.request_count = 0
+        self.last_request_time = 0
+        self.rate_limit_delay = 3.0  # 增加到3秒间隔
+        self.max_requests_per_minute = 20  # 降低到每分钟20次
+        self._429_retry_count = {}  # 记录每个符号的429重试次数
+        self.max_429_retries = 2  # 429错误最大重试次数
+
         # 数据源配置
         self.data_sources = {
             "yahoo_finance": {
                 "enabled": True,
                 "base_url": "https://query1.finance.yahoo.com/v8/finance/chart",
                 "timeout": 10,
-                "priority": 1
+                "priority": 1,
+                "fallback": True  # 是否作为降级选项
             },
             "alpha_vantage": {
                 "enabled": False,  # 需要API key
                 "base_url": "https://www.alphavantage.co/query",
                 "timeout": 10,
-                "priority": 2
+                "priority": 2,
+                "fallback": False
+            }
+        }
+
+        # 模拟数据（用于API失败时的降级）
+        self.fallback_data = {
+            "default_market_data": {
+                "source": "fallback",
+                "quality_score": 0.3,
+                "note": "数据源不可用，使用默认值"
             }
         }
 
@@ -156,6 +175,58 @@ class DataEnhancer:
         age = (datetime.now(HONGKONG_TZ) - cached_time).total_seconds()
         return age < self.cache_ttl
 
+    async def _apply_rate_limit(self, symbol: str = ""):
+        """应用请求限流 - 针对429错误优化"""
+        import time
+
+        current_time = time.time()
+
+        # 检查429重试次数
+        retry_count = self._429_retry_count.get(symbol, 0)
+        if retry_count >= self.max_429_retries:
+            logger.warning(f"符号 {symbol} 429错误重试次数已达上限，直接返回降级数据")
+            raise httpx.HTTPStatusError("429重试次数超限", request=None, response=None)
+
+        # 检查是否需要限流
+        if current_time - self.last_request_time < 60:  # 1分钟内
+            if self.request_count >= self.max_requests_per_minute:
+                wait_time = 60 - (current_time - self.last_request_time)
+                logger.warning(f"API请求达到限制，等待 {wait_time:.1f} 秒")
+                await asyncio.sleep(wait_time)
+                self.request_count = 0
+                self.last_request_time = time.time()
+
+        # 如果有429错误历史，增加延迟
+        actual_delay = self.rate_limit_delay
+        if retry_count > 0:
+            actual_delay = self.rate_limit_delay * (2 ** retry_count)  # 指数退避
+            logger.info(f"符号 {symbol} 有429错误历史，延迟增加到 {actual_delay:.1f} 秒")
+
+        # 添加请求间隔延迟
+        if self.request_count > 0 and current_time - self.last_request_time < actual_delay:
+            delay = actual_delay - (current_time - self.last_request_time)
+            await asyncio.sleep(delay)
+
+        self.request_count += 1
+        if current_time - self.last_request_time > 60:
+            self.request_count = 1
+        self.last_request_time = current_time
+
+    def _create_fallback_market_data(self, symbol: str) -> MarketData:
+        """创建降级市场数据"""
+        logger.info(f"为 {symbol} 创建降级市场数据")
+
+        return MarketData(
+            symbol=symbol,
+            price=None,
+            change=None,
+            change_percent=None,
+            volume=None,
+            timestamp=datetime.now(HONGKONG_TZ),
+            source="fallback",
+            quality_score=0.2
+        )
+
     async def get_market_data(self, symbol: str) -> MarketData:
         """
         获取市场数据
@@ -172,8 +243,22 @@ class DataEnhancer:
             logger.debug(f"使用缓存的市场数据: {symbol}")
             return self.market_data_cache[cache_key]["data"]
 
+        # 应用请求限流（传递symbol用于429处理）
+        try:
+            await self._apply_rate_limit(symbol)
+        except httpx.HTTPStatusError as e:
+            # 429重试次数超限，直接返回降级数据
+            logger.warning(f"符号 {symbol} 429重试次数超限，使用降级数据")
+            market_data = self._create_fallback_market_data(symbol)
+            self.market_data_cache[cache_key] = {
+                "data": market_data,
+                "timestamp": datetime.now(HONGKONG_TZ)
+            }
+            return market_data
+
         # 尝试从各个数据源获取
         market_data = None
+        last_error = None
 
         # Yahoo Finance (免费且相对可靠)
         if self.data_sources["yahoo_finance"]["enabled"]:
@@ -181,15 +266,36 @@ class DataEnhancer:
                 market_data = await self._fetch_yahoo_finance(symbol)
                 if market_data:
                     logger.info(f"从Yahoo Finance获取到数据: {symbol}")
+                    # 重置429重试计数
+                    if symbol in self._429_retry_count:
+                        del self._429_retry_count[symbol]
+            except httpx.HTTPStatusError as e:
+                last_error = f"HTTP {e.response.status_code}"
+                if e.response.status_code == 429:
+                    logger.warning(f"Yahoo Finance请求过于频繁 {symbol}: {last_error}")
+                    # 记录429错误
+                    self._429_retry_count[symbol] = self._429_retry_count.get(symbol, 0) + 1
+                    # 增加缓存时间以减少后续请求
+                    self.cache_ttl = min(self.cache_ttl * 2, 1800)  # 最多30分钟
+                elif e.response.status_code == 404:
+                    logger.warning(f"Yahoo Finance找不到股票代码 {symbol}: {last_error}")
+                else:
+                    logger.warning(f"Yahoo Finance HTTP错误 {symbol}: {last_error}")
             except Exception as e:
-                logger.warning(f"Yahoo Finance获取数据失败 {symbol}: {e}")
+                last_error = str(e)
+                logger.warning(f"Yahoo Finance获取数据失败 {symbol}: {last_error}")
 
-        # 如果没有数据，返回默认值
+        # 如果主数据源失败，尝试降级策略
+        if not market_data and last_error:
+            logger.info(f"主数据源失败，使用降级策略: {symbol}")
+            market_data = self._create_fallback_market_data(symbol)
+
+        # 如果完全没有数据，创建空数据对象
         if not market_data:
-            logger.warning(f"无法获取市场数据: {symbol}")
+            logger.warning(f"无法获取市场数据，返回空数据: {symbol}")
             market_data = MarketData(
                 symbol=symbol,
-                source="unavailable",
+                source="failed",
                 quality_score=0.0
             )
 

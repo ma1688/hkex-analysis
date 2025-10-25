@@ -90,14 +90,33 @@ def get_real_time_stock_info(symbol: str) -> str:
                     result_parts.append(f"涨跌幅: {market.change_percent:+.2f}%")
 
                 result_parts.append(f"数据源: {market.source}")
-                result_parts.append(f"质量分数: {market.quality_score:.2f}")
+                result_parts.append(f"数据质量: {market.quality_score:.2f}")
 
             if enhanced_data.quality:
                 quality = enhanced_data.quality
-                result_parts.append(f"数据质量评估: {quality.score:.2f}")
+                result_parts.append(f"质量评估: {quality.score:.2f}")
 
                 if quality.issues:
-                    result_parts.append(f"发现问题: {', '.join(quality.issues[:2])}")
+                    result_parts.append(f"问题: {', '.join(quality.issues[:2])}")
+
+                if market.source in ["fallback", "failed", "unavailable"]:
+                    result_parts.append("⚠️  当前为降级模式")
+
+            # 添加当前市场状态信息
+            import pytz
+            from datetime import datetime
+            hk_tz = pytz.timezone('Asia/Hong_Kong')
+            now = datetime.now(hk_tz)
+            weekday = now.weekday()
+
+            if weekday >= 5:  # 周末
+                result_parts.append("📅 港股市场休市")
+            elif 9.5 <= now.hour < 12 or 13 <= now.hour < 16:
+                result_parts.append("📈 港股交易时段")
+            elif 12 <= now.hour < 13:
+                result_parts.append("☕ 港股午休时间")
+            else:
+                result_parts.append("📉 港股收盘")
 
             return "\n".join(result_parts) if result_parts else "暂无数据"
 
@@ -108,7 +127,25 @@ def get_real_time_stock_info(symbol: str) -> str:
 
     except Exception as e:
         logger.error(f"获取股票信息失败: {e}")
-        return f"获取股票信息失败: {str(e)}"
+
+        # 提供更友好的错误信息
+        if "429" in str(e) or "Too Many Requests" in str(e):
+            return (
+                "🚫 请求过于频繁，系统已自动启用降级模式。\n"
+                "• 当前显示为缓存或模拟数据\n"
+                "• 建议稍后重试或使用专业股票软件查看实时数据\n"
+                "• 系统将在5-30分钟后自动恢复实时数据获取"
+            )
+        elif "timeout" in str(e).lower():
+            return "⏳  请求超时，请稍后再试或使用其他数据源。"
+        elif "429重试次数超限" in str(e):
+            return (
+                "🔄 当前股票代码请求次数过多，已临时切换到降级模式。\n"
+                f"• {symbol} 的实时数据获取已暂停\n"
+                "• 建议查询其他股票代码或30分钟后再试"
+            )
+        else:
+            return f"❌ 获取股票信息失败: {str(e)[:100]}"
 
 
 @tool
