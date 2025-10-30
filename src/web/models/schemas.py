@@ -61,6 +61,7 @@ class DocumentInfo(BaseModel):
     doc_id: str
     stock_code: str
     company_name: str
+    title: Optional[str] = None  # 文档标题
     document_type: str
     document_subtype: str
     announcement_date: datetime

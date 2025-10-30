@@ -7,11 +7,14 @@
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h2><i class="fas fa-database me-2"></i>数据管理</h2>
         <div>
-            <button class="btn btn-outline-primary" onclick="refreshData()">
-                <i class="fas fa-sync-alt me-1"></i>刷新
+            <button class="btn btn-outline-danger" onclick="showDeleteAllModal()" id="delete-all-btn" title="清空所有数据">
+                <i class="fas fa-trash-alt me-1"></i>清空所有数据
             </button>
             <button class="btn btn-warning ms-2" onclick="showCleanupModal()">
                 <i class="fas fa-broom me-1"></i>清理重复数据
+            </button>
+            <button class="btn btn-outline-primary ms-2" onclick="refreshData()">
+                <i class="fas fa-sync-alt me-1"></i>刷新
             </button>
         </div>
     </div>
@@ -90,29 +93,39 @@
     <!-- 文档列表 -->
     <div class="card">
         <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
-            <h5 class="mb-0">
-                <i class="fas fa-list me-2"></i>文档列表
-            </h5>
-            <span class="badge bg-light text-dark" id="doc-count">0 条记录</span>
+            <div>
+                <input type="checkbox" id="select-all" class="me-2" onchange="toggleSelectAll()">
+                <h5 class="d-inline mb-0">
+                    <i class="fas fa-list me-2"></i>文档列表
+                </h5>
+            </div>
+            <div>
+                <span class="badge bg-light text-dark me-3" id="doc-count">0 条记录</span>
+                <button class="btn btn-sm btn-danger" id="batch-delete-btn" onclick="batchDelete()" style="display: none;">
+                    <i class="fas fa-trash me-1"></i>删除选中 (<span id="selected-count">0</span>)
+                </button>
+            </div>
         </div>
         <div class="card-body">
             <div class="table-responsive">
                 <table class="table table-hover" id="documents-table">
                     <thead>
                         <tr>
+                            <th width="50"></th>
                             <th>文档ID</th>
                             <th>股票代码</th>
                             <th>公司名称</th>
+                            <th>文档标题</th>
                             <th>文档类型</th>
                             <th>公告日期</th>
                             <th>章节数</th>
                             <th>创建时间</th>
-                            <th>操作</th>
+                            <th width="100">操作</th>
                         </tr>
                     </thead>
                     <tbody id="documents-tbody">
                         <tr>
-                            <td colspan="8" class="text-center">
+                            <td colspan="10" class="text-center">
                                 <div class="spinner-border"></div>
                             </td>
                         </tr>
@@ -232,7 +245,7 @@
         if (documents.length === 0) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="8" class="text-center text-muted">
+                    <td colspan="10" class="text-center text-muted">
                         <i class="fas fa-inbox fa-3x mb-3 d-block"></i>
                         暂无数据
                     </td>
@@ -244,6 +257,9 @@
         tbody.innerHTML = documents.map(doc => `
             <tr>
                 <td>
+                    <input type="checkbox" class="doc-checkbox" value="${doc.doc_id}" onchange="updateBatchDeleteBtn()">
+                </td>
+                <td>
                     <code>${doc.doc_id.substring(0, 12)}...</code>
                 </td>
                 <td>
@@ -252,6 +268,11 @@
                 <td>
                     <span class="text-truncate d-inline-block" style="max-width: 200px;" title="${doc.company_name}">
                         ${doc.company_name}
+                    </span>
+                </td>
+                <td>
+                    <span class="text-truncate d-inline-block" style="max-width: 250px;" title="${doc.title || '无标题'}">
+                        ${doc.title || '无标题'}
                     </span>
                 </td>
                 <td>
@@ -267,8 +288,11 @@
                     <small>${new Date(doc.created_at).toLocaleString()}</small>
                 </td>
                 <td>
-                    <button class="btn btn-sm btn-outline-primary" onclick="viewDocument('${doc.doc_id}')" title="查看详情">
+                    <button class="btn btn-sm btn-outline-primary me-1" onclick="viewDocument('${doc.doc_id}')" title="查看详情">
                         <i class="fas fa-eye"></i>
+                    </button>
+                    <button class="btn btn-sm btn-outline-danger" onclick="deleteSingleDocument('${doc.doc_id}', '${doc.company_name}')" title="删除">
+                        <i class="fas fa-trash"></i>
                     </button>
                 </td>
             </tr>
@@ -338,7 +362,7 @@
             if (documents.length === 0) {
                 tbody.innerHTML = `
                     <tr>
-                        <td colspan="8" class="text-center text-muted">
+                        <td colspan="10" class="text-center text-muted">
                             未找到匹配的数据
                         </td>
                     </tr>
@@ -348,16 +372,27 @@
 
             tbody.innerHTML = documents.map(doc => `
                 <tr>
+                    <td>
+                        <input type="checkbox" class="doc-checkbox" value="${doc.doc_id}" onchange="updateBatchDeleteBtn()">
+                    </td>
                     <td><code>${doc.doc_id.substring(0, 12)}...</code></td>
                     <td><strong>${doc.stock_code}</strong></td>
                     <td>${doc.company_name}</td>
+                    <td>
+                        <span class="text-truncate d-inline-block" style="max-width: 250px;" title="${doc.title || '无标题'}">
+                            ${doc.title || '无标题'}
+                        </span>
+                    </td>
                     <td><span class="badge bg-secondary">${doc.document_type}</span></td>
                     <td>${new Date(doc.announcement_date).toLocaleDateString()}</td>
                     <td><span class="badge bg-info">${doc.section_count}</span></td>
                     <td><small>${new Date(doc.created_at).toLocaleString()}</small></td>
                     <td>
-                        <button class="btn btn-sm btn-outline-primary" onclick="viewDocument('${doc.doc_id}')">
+                        <button class="btn btn-sm btn-outline-primary me-1" onclick="viewDocument('${doc.doc_id}')" title="查看详情">
                             <i class="fas fa-eye"></i>
+                        </button>
+                        <button class="btn btn-sm btn-outline-danger" onclick="deleteSingleDocument('${doc.doc_id}', '${doc.company_name}')" title="删除">
+                            <i class="fas fa-trash"></i>
                         </button>
                     </td>
                 </tr>
@@ -399,6 +434,7 @@
                         <p><strong>文档ID：</strong><br><code>${doc.doc_id}</code></p>
                         <p><strong>股票代码：</strong><br>${doc.stock_code}</p>
                         <p><strong>公司名称：</strong><br>${doc.company_name}</p>
+                        <p><strong>文档标题：</strong><br>${doc.title || '无标题'}</p>
                         <p><strong>文档类型：</strong><br>${doc.document_type} - ${doc.document_subtype}</p>
                     </div>
                     <div class="col-md-6">
@@ -547,6 +583,143 @@
         loadStats();
         loadDocuments(1);
         showAlert('数据已刷新', 'info');
+    }
+
+    // 删除单个文档
+    async function deleteSingleDocument(docId, companyName) {
+        if (!confirm(`确定要删除文档吗？\n\n公司：${companyName}\nID：${docId.substring(0, 12)}...\n\n此操作不可恢复！`)) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`/data/documents/${docId}`, {
+                method: 'DELETE'
+            });
+
+            if (!response.ok) {
+                throw new Error('删除失败');
+            }
+
+            showAlert('文档删除成功', 'success');
+            loadStats();
+            loadDocuments(currentPage);
+
+        } catch (error) {
+            console.error('删除文档失败:', error);
+            showAlert('删除文档失败: ' + error.message, 'danger');
+        }
+    }
+
+    // 全选/取消全选
+    function toggleSelectAll() {
+        const selectAll = document.getElementById('select-all');
+        const checkboxes = document.querySelectorAll('.doc-checkbox');
+
+        checkboxes.forEach(checkbox => {
+            checkbox.checked = selectAll.checked;
+        });
+
+        updateBatchDeleteBtn();
+    }
+
+    // 更新批量删除按钮状态
+    function updateBatchDeleteBtn() {
+        const checkboxes = document.querySelectorAll('.doc-checkbox:checked');
+        const batchDeleteBtn = document.getElementById('batch-delete-btn');
+        const selectedCount = document.getElementById('selected-count');
+
+        if (checkboxes.length > 0) {
+            batchDeleteBtn.style.display = 'inline-block';
+            selectedCount.textContent = checkboxes.length;
+        } else {
+            batchDeleteBtn.style.display = 'none';
+        }
+    }
+
+    // 批量删除
+    async function batchDelete() {
+        const checkboxes = document.querySelectorAll('.doc-checkbox:checked');
+        const docIds = Array.from(checkboxes).map(cb => cb.value);
+
+        if (docIds.length === 0) {
+            showAlert('请先选择要删除的文档', 'warning');
+            return;
+        }
+
+        if (!confirm(`确定要删除选中的 ${docIds.length} 个文档吗？此操作不可恢复！`)) {
+            return;
+        }
+
+        try {
+            const response = await fetch('/data/documents/batch-delete', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(docIds)
+            });
+
+            if (!response.ok) {
+                throw new Error('批量删除失败');
+            }
+
+            const data = await response.json();
+            showAlert(data.message, 'success');
+
+            // 重置选择状态
+            document.getElementById('select-all').checked = false;
+            loadStats();
+            loadDocuments(currentPage);
+
+        } catch (error) {
+            console.error('批量删除失败:', error);
+            showAlert('批量删除失败: ' + error.message, 'danger');
+        }
+    }
+
+    // 显示删除所有数据确认模态框
+    function showDeleteAllModal() {
+        if (!confirm('⚠️ 危险操作确认 ⚠️\n\n确定要清空所有数据吗？\n\n这将删除：\n- 所有文档\n- 所有章节\n- 所有相关数据\n\n此操作不可恢复且无法撤销！\n\n如果确定，请在接下来的确认框中点击"确定"。')) {
+            return;
+        }
+
+        if (confirm('最后确认：真的要清空所有数据吗？此操作将删除数据库中的所有内容！')) {
+            deleteAllData();
+        }
+    }
+
+    // 删除所有数据
+    async function deleteAllData() {
+        const deleteBtn = document.getElementById('delete-all-btn');
+        const originalText = deleteBtn.innerHTML;
+        deleteBtn.disabled = true;
+        deleteBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>删除中...';
+
+        try {
+            const response = await fetch('/data/all', {
+                method: 'DELETE'
+            });
+
+            if (!response.ok) {
+                throw new Error('清空数据失败');
+            }
+
+            const data = await response.json();
+            showAlert('所有数据已清空', 'success');
+
+            // 延迟刷新，确保数据库操作完成
+            setTimeout(() => {
+                loadStats();
+                loadDocuments(1);
+            }, 1000);
+
+        } catch (error) {
+            console.error('清空数据失败:', error);
+            showAlert('清空数据失败: ' + error.message, 'danger');
+        } finally {
+            deleteBtn.disabled = false;
+            deleteBtn.innerHTML = originalText;
+        }
     }
 
     // 页面加载完成后执行

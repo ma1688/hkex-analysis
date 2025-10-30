@@ -98,3 +98,32 @@ async def preview_duplicates():
             for f in result.files_to_delete
         ]
     }
+
+@router.delete("/documents/{doc_id}", response_model=dict)
+async def delete_document(doc_id: str = Path(..., description="文档ID")):
+    """删除单个文档"""
+    success = data_service.delete_document(doc_id)
+    if not success:
+        raise HTTPException(status_code=500, detail="删除文档失败")
+
+    return {"message": "文档删除成功", "doc_id": doc_id}
+
+@router.post("/documents/batch-delete", response_model=dict)
+async def batch_delete_documents(doc_ids: List[str]):
+    """批量删除文档"""
+    deleted_count = data_service.delete_documents_batch(doc_ids)
+
+    return {
+        "message": f"成功删除 {deleted_count} 个文档",
+        "total_requested": len(doc_ids),
+        "deleted_count": deleted_count
+    }
+
+@router.delete("/all", response_model=dict)
+async def delete_all_data():
+    """清空所有数据（危险操作）"""
+    success = data_service.delete_all_data()
+    if not success:
+        raise HTTPException(status_code=500, detail="清空数据失败")
+
+    return {"message": "所有数据已清空"}

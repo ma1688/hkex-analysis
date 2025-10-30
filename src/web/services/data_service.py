@@ -38,38 +38,33 @@ class DataService:
         """获取文档列表"""
         query = """
         SELECT
-            doc_id, stock_code, company_name, document_type,
+            doc_id, stock_code, company_name, title, document_type,
             document_subtype, announcement_date, section_count,
             metadata, created_at
         FROM documents_v2
         """
 
         conditions = []
-        params = {}
 
         if stock_code:
-            conditions.append("stock_code = {stock_code}")
-            params['stock_code'] = stock_code
+            conditions.append(f"stock_code = '{stock_code}'")
 
         if document_type:
-            conditions.append("document_type = {document_type}")
-            params['document_type'] = document_type
+            conditions.append(f"document_type = '{document_type}'")
 
         if conditions:
             query += " WHERE " + " AND ".join(conditions)
 
-        query += " ORDER BY created_at DESC LIMIT {limit} OFFSET {offset}"
-        params['limit'] = limit
-        params['offset'] = offset
+        query += f" ORDER BY created_at DESC LIMIT {limit} OFFSET {offset}"
 
-        result = self.client.query(query, parameters=params).result_rows
+        result = self.client.query(query).result_rows
 
         # 获取总数
         count_query = "SELECT count() FROM documents_v2"
         if conditions:
             count_query += " WHERE " + " AND ".join(conditions)
 
-        total = self.client.query(count_query, parameters=params).result_rows[0][0]
+        total = self.client.query(count_query).result_rows[0][0]
 
         documents = []
         for row in result:
@@ -77,12 +72,13 @@ class DataService:
                 doc_id=row[0],
                 stock_code=row[1],
                 company_name=row[2],
-                document_type=row[3],
-                document_subtype=row[4],
-                announcement_date=row[5],
-                section_count=row[6],
-                metadata=eval(row[7]) if row[7] else {},
-                created_at=row[8]
+                title=row[3],
+                document_type=row[4],
+                document_subtype=row[5],
+                announcement_date=row[6],
+                section_count=row[7],
+                metadata=eval(row[8]) if row[8] else {},
+                created_at=row[9]
             )
             documents.append(doc)
 
@@ -90,16 +86,16 @@ class DataService:
 
     def get_document(self, doc_id: str) -> Optional[DocumentInfo]:
         """获取单个文档"""
-        query = """
+        query = f"""
         SELECT
-            doc_id, stock_code, company_name, document_type,
+            doc_id, stock_code, company_name, title, document_type,
             document_subtype, announcement_date, section_count,
             metadata, created_at
         FROM documents_v2
-        WHERE doc_id = {doc_id}
+        WHERE doc_id = '{doc_id}'
         """
 
-        result = self.client.query(query, parameters={'doc_id': doc_id}).result_rows
+        result = self.client.query(query).result_rows
 
         if not result:
             return None
@@ -109,30 +105,28 @@ class DataService:
             doc_id=row[0],
             stock_code=row[1],
             company_name=row[2],
-            document_type=row[3],
-            document_subtype=row[4],
-            announcement_date=row[5],
-            section_count=row[6],
-            metadata=eval(row[7]) if row[7] else {},
-            created_at=row[8]
+            title=row[3],
+            document_type=row[4],
+            document_subtype=row[5],
+            announcement_date=row[6],
+            section_count=row[7],
+            metadata=eval(row[8]) if row[8] else {},
+            created_at=row[9]
         )
 
     def get_sections(self, doc_id: str, limit: int = 100) -> List[SectionInfo]:
         """获取章节列表"""
-        query = """
+        query = f"""
         SELECT
             section_id, doc_id, section_type, section_title,
             section_index, content, char_count, metadata
         FROM document_sections
-        WHERE doc_id = {doc_id}
+        WHERE doc_id = '{doc_id}'
         ORDER BY section_index
         LIMIT {limit}
         """
 
-        result = self.client.query(
-            query,
-            parameters={'doc_id': doc_id, 'limit': limit}
-        ).result_rows
+        result = self.client.query(query).result_rows
 
         sections = []
         for row in result:
@@ -195,16 +189,14 @@ class DataService:
 
         # 处理统计
         last_week = datetime.now() - timedelta(days=7)
-        query_str = """
+        last_week_str = last_week.strftime('%Y-%m-%d %H:%M:%S')
+        query_str = f"""
             SELECT count()
             FROM documents_v2
-            WHERE created_at >= toDateTime({last_week})
+            WHERE created_at >= toDateTime('{last_week_str}')
         """
         processing_stats = {
-            'this_week': self.client.query(
-                query_str,
-                parameters={'last_week': last_week.strftime('%Y-%m-%d %H:%M:%S')}
-            ).result_rows[0][0],
+            'this_week': self.client.query(query_str).result_rows[0][0],
             'total': total_documents
         }
 
@@ -307,22 +299,20 @@ class DataService:
 
     def search_documents(self, query: str, limit: int = 50) -> List[DocumentInfo]:
         """搜索文档"""
-        search_query = """
+        search_pattern = f'%{query}%'
+        search_query = f"""
         SELECT
-            doc_id, stock_code, company_name, document_type,
+            doc_id, stock_code, company_name, title, document_type,
             document_subtype, announcement_date, section_count,
             metadata, created_at
         FROM documents_v2
-        WHERE company_name ILIKE {search_pattern}
-           OR stock_code = {stock_code}
+        WHERE company_name ILIKE '{search_pattern}'
+           OR stock_code = '{query}'
         ORDER BY created_at DESC
         LIMIT {limit}
         """
 
-        result = self.client.query(
-            search_query,
-            parameters=[f'%{query}%', query, limit]
-        ).result_rows
+        result = self.client.query(search_query).result_rows
 
         documents = []
         for row in result:
@@ -330,16 +320,56 @@ class DataService:
                 doc_id=row[0],
                 stock_code=row[1],
                 company_name=row[2],
-                document_type=row[3],
-                document_subtype=row[4],
-                announcement_date=row[5],
-                section_count=row[6],
-                metadata=eval(row[7]) if row[7] else {},
-                created_at=row[8]
+                title=row[3],
+                document_type=row[4],
+                document_subtype=row[5],
+                announcement_date=row[6],
+                section_count=row[7],
+                metadata=eval(row[8]) if row[8] else {},
+                created_at=row[9]
             )
             documents.append(doc)
 
         return documents
+
+    def delete_document(self, doc_id: str) -> bool:
+        """删除单个文档"""
+        try:
+            # 先删除章节
+            self.client.command(
+                f"ALTER TABLE document_sections DELETE WHERE doc_id = '{doc_id}'"
+            )
+            # 再删除文档
+            self.client.command(
+                f"ALTER TABLE documents_v2 DELETE WHERE doc_id = '{doc_id}'"
+            )
+            return True
+        except Exception as e:
+            print(f"删除文档失败: {e}")
+            return False
+
+    def delete_documents_batch(self, doc_ids: List[str]) -> int:
+        """批量删除文档"""
+        deleted_count = 0
+        for doc_id in doc_ids:
+            if self.delete_document(doc_id):
+                deleted_count += 1
+        return deleted_count
+
+    def delete_all_data(self) -> bool:
+        """清空所有数据（危险操作）"""
+        try:
+            # 删除所有章节
+            self.client.command("ALTER TABLE document_sections DELETE WHERE 1")
+            # 删除所有文档
+            self.client.command("ALTER TABLE documents_v2 DELETE WHERE 1")
+            # 优化表
+            self.client.command("OPTIMIZE TABLE documents_v2 FINAL")
+            self.client.command("OPTIMIZE TABLE document_sections FINAL")
+            return True
+        except Exception as e:
+            print(f"清空数据失败: {e}")
+            return False
 
 # 全局数据服务实例
 data_service = DataService()
