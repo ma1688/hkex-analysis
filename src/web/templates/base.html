@@ -249,6 +249,10 @@
                             <i class="fas fa-chart-bar"></i>
                             <span>统计分析</span>
                         </a>
+                        <a class="nav-link {% if request.url.path == '/init' %}active{% endif %}" href="/init">
+                            <i class="fas fa-tools"></i>
+                            <span>数据库初始化</span>
+                        </a>
                         <hr class="my-3" style="border-color: rgba(255,255,255,0.2);">
                         <a class="nav-link" href="/api/docs" target="_blank">
                             <i class="fas fa-code"></i>
