@@ -1,0 +1,293 @@
+{% extends "base.html" %}
+
+{% block title %}首页 - 港股公告分析管理系统{% endblock %}
+
+{% block content %}
+<div class="fade-in">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="fas fa-tachometer-alt me-2"></i>系统概览</h2>
+        <div>
+            <a href="/upload" class="btn btn-primary">
+                <i class="fas fa-upload me-1"></i>上传文档
+            </a>
+            <a href="/tasks" class="btn btn-outline-primary ms-2">
+                <i class="fas fa-tasks me-1"></i>查看任务
+            </a>
+        </div>
+    </div>
+
+    <!-- 统计卡片 -->
+    <div class="row mb-4" id="stats-cards">
+        <div class="col-md-3">
+            <div class="stat-card">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="stat-value" id="total-docs">-</div>
+                        <div class="stat-label">总文档数</div>
+                    </div>
+                    <div class="stat-icon">
+                        <i class="fas fa-file-pdf"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-card">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="stat-value" id="total-sections">-</div>
+                        <div class="stat-label">总章节数</div>
+                    </div>
+                    <div class="stat-icon">
+                        <i class="fas fa-list"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-card">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="stat-value" id="active-tasks">-</div>
+                        <div class="stat-label">活跃任务</div>
+                    </div>
+                    <div class="stat-icon">
+                        <i class="fas fa-spinner"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-card">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="stat-value" id="completed-tasks">-</div>
+                        <div class="stat-label">已完成任务</div>
+                    </div>
+                    <div class="stat-icon">
+                        <i class="fas fa-check-circle"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 文档类型分布 -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-chart-pie me-2"></i>文档类型分布
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="docTypeChart" height="200"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-building me-2"></i>热门公司 TOP 5
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div id="top-companies">
+                        <div class="text-center">
+                            <div class="spinner-border spinner-border-sm"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 最近任务 -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="fas fa-clock me-2"></i>最近任务
+                    </h5>
+                    <a href="/tasks" class="btn btn-sm btn-light">查看全部</a>
+                </div>
+                <div class="card-body">
+                    <div id="recent-tasks">
+                        <div class="text-center py-4">
+                            <div class="spinner-border"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 快速操作 -->
+    <div class="row">
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-body text-center">
+                    <i class="fas fa-upload fa-3x text-primary mb-3"></i>
+                    <h5>上传文档</h5>
+                    <p class="text-muted">批量上传PDF文档进行自动切块处理</p>
+                    <a href="/upload" class="btn btn-primary">立即上传</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-body text-center">
+                    <i class="fas fa-database fa-3x text-success mb-3"></i>
+                    <h5>数据管理</h5>
+                    <p class="text-muted">查看和管理已处理的数据和文档</p>
+                    <a href="/data" class="btn btn-success">进入管理</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-body text-center">
+                    <i class="fas fa-chart-bar fa-3x text-info mb-3"></i>
+                    <h5>统计分析</h5>
+                    <p class="text-muted">查看系统使用和数据分析统计</p>
+                    <a href="/stats" class="btn btn-info">查看统计</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    // 加载统计数据
+    async function loadStats() {
+        try {
+            // 加载系统统计
+            const statsRes = await fetch('/stats/');
+            const stats = await statsRes.json();
+
+            document.getElementById('total-docs').textContent = stats.total_documents;
+            document.getElementById('total-sections').textContent = stats.total_sections;
+
+            // 加载任务统计
+            const taskStatsRes = await fetch('/tasks/stats/summary');
+            const taskStats = await taskStatsRes.json();
+
+            document.getElementById('active-tasks').textContent = taskStats.pending + taskStats.processing;
+            document.getElementById('completed-tasks').textContent = taskStats.completed;
+
+            // 绘制文档类型分布图
+            const ctx = document.getElementById('docTypeChart').getContext('2d');
+            const docTypes = Object.keys(stats.documents_by_type);
+            const docCounts = Object.values(stats.documents_by_type);
+
+            new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: docTypes,
+                    datasets: [{
+                        data: docCounts,
+                        backgroundColor: [
+                            '#667eea',
+                            '#764ba2',
+                            '#f093fb',
+                            '#4facfe',
+                            '#43e97b'
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+
+            // 显示热门公司
+            const topCompaniesDiv = document.getElementById('top-companies');
+            topCompaniesDiv.innerHTML = stats.top_companies.map(company => `
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="text-truncate" style="max-width: 200px;">${company.company_name}</span>
+                    <span class="badge bg-primary">${company.count}</span>
+                </div>
+            `).join('');
+
+        } catch (error) {
+            console.error('加载统计数据失败:', error);
+            showAlert('加载统计数据失败', 'danger');
+        }
+    }
+
+    // 加载最近任务
+    async function loadRecentTasks() {
+        try {
+            const response = await fetch('/tasks/?limit=5');
+            const tasks = await response.json();
+
+            const tasksDiv = document.getElementById('recent-tasks');
+            if (tasks.length === 0) {
+                tasksDiv.innerHTML = '<p class="text-muted text-center">暂无任务</p>';
+                return;
+            }
+
+            tasksDiv.innerHTML = tasks.map(task => {
+                const statusBadge = getStatusBadge(task.status);
+                const progress = task.progress || 0;
+
+                return `
+                    <div class="task-item border-bottom pb-3 mb-3">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <div>
+                                <strong>${task.stock_code}</strong>
+                                <small class="text-muted ms-2">${task.document_type}</small>
+                                ${statusBadge}
+                            </div>
+                            <small class="text-muted">${new Date(task.created_at).toLocaleString()}</small>
+                        </div>
+                        <div class="progress mb-1" style="height: 6px;">
+                            <div class="progress-bar" style="width: ${progress}%"></div>
+                        </div>
+                        <small class="text-muted">${task.message || ''}</small>
+                    </div>
+                `;
+            }).join('');
+
+        } catch (error) {
+            console.error('加载最近任务失败:', error);
+        }
+    }
+
+    // 获取状态徽章
+    function getStatusBadge(status) {
+        const badges = {
+            'pending': '<span class="badge bg-warning status-badge">等待中</span>',
+            'processing': '<span class="badge bg-info status-badge">处理中</span>',
+            'completed': '<span class="badge bg-success status-badge">已完成</span>',
+            'failed': '<span class="badge bg-danger status-badge">失败</span>',
+            'cancelled': '<span class="badge bg-secondary status-badge">已取消</span>'
+        };
+        return badges[status] || '';
+    }
+
+    // 页面加载完成后执行
+    document.addEventListener('DOMContentLoaded', () => {
+        loadStats();
+        loadRecentTasks();
+
+        // 每30秒刷新一次
+        setInterval(() => {
+            loadStats();
+            loadRecentTasks();
+        }, 30000);
+    });
+</script>
+{% endblock %}

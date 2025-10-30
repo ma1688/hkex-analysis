@@ -1,0 +1,434 @@
+{% extends "base.html" %}
+
+{% block title %}统计分析 - 港股公告分析管理系统{% endblock %}
+
+{% block content %}
+<div class="fade-in">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="fas fa-chart-bar me-2"></i>统计分析</h2>
+        <button class="btn btn-outline-primary" onclick="refreshStats()">
+            <i class="fas fa-sync-alt me-1"></i>刷新
+        </button>
+    </div>
+
+    <!-- 总体统计 -->
+    <div class="row mb-4" id="overview-stats">
+        <div class="col-md-3">
+            <div class="stat-card">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="stat-value" id="total-documents">-</div>
+                        <div class="stat-label">总文档数</div>
+                    </div>
+                    <div class="stat-icon">
+                        <i class="fas fa-file-pdf"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-card">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="stat-value" id="total-sections">-</div>
+                        <div class="stat-label">总章节数</div>
+                    </div>
+                    <div class="stat-icon">
+                        <i class="fas fa-list"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-card">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="stat-value" id="this-week">-</div>
+                        <div class="stat-label">本周新增</div>
+                    </div>
+                    <div class="stat-icon">
+                        <i class="fas fa-calendar-week"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-card">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="stat-value" id="avg-sections">-</div>
+                        <div class="stat-label">平均章节数</div>
+                    </div>
+                    <div class="stat-icon">
+                        <i class="fas fa-chart-line"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 图表区域 -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-chart-pie me-2"></i>文档类型分布
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="docTypeChart" height="300"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-chart-bar me-2"></i>热门公司 TOP 10
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="topCompaniesChart" height="300"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 最近文档 -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="fas fa-clock me-2"></i>最近文档
+                    </h5>
+                    <a href="/data" class="btn btn-sm btn-light">查看全部</a>
+                </div>
+                <div class="card-body">
+                    <div id="recent-documents">
+                        <div class="text-center py-4">
+                            <div class="spinner-border"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 详细统计 -->
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="mb-0">
+                        <i class="fas fa-list-ol me-2"></i>处理统计
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div id="processing-stats">
+                        <div class="text-center py-3">
+                            <div class="spinner-border"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-secondary text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-info-circle me-2"></i>系统信息
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <table class="table table-sm">
+                        <tr>
+                            <td><i class="fas fa-server me-2"></i>数据库</td>
+                            <td><span class="badge bg-success">ClickHouse</span></td>
+                        </tr>
+                        <tr>
+                            <td><i class="fas fa-code me-2"></i>框架</td>
+                            <td><span class="badge bg-primary">FastAPI</span></td>
+                        </tr>
+                        <tr>
+                            <td><i class="fas fa-chart-area me-2"></i>图表库</td>
+                            <td><span class="badge bg-info">Chart.js</span></td>
+                        </tr>
+                        <tr>
+                            <td><i class="fas fa-calendar me-2"></i>统计时间</td>
+                            <td><span id="stats-time">-</span></td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    let docTypeChartInstance = null;
+    let topCompaniesChartInstance = null;
+
+    // 加载统计数据
+    async function loadStats() {
+        try {
+            const response = await fetch('/stats/');
+            const stats = await response.json();
+
+            // 更新概览统计
+            document.getElementById('total-documents').textContent = stats.total_documents;
+            document.getElementById('total-sections').textContent = stats.total_sections;
+            document.getElementById('this-week').textContent = stats.processing_stats.this_week;
+
+            const avgSections = stats.total_documents > 0
+                ? Math.round(stats.total_sections / stats.total_documents * 10) / 10
+                : 0;
+            document.getElementById('avg-sections').textContent = avgSections;
+
+            // 更新图表
+            updateCharts(stats);
+
+            // 更新最近文档
+            displayRecentDocuments(stats.recent_documents);
+
+            // 更新处理统计
+            displayProcessingStats(stats);
+
+            // 更新时间
+            document.getElementById('stats-time').textContent = new Date().toLocaleString();
+
+        } catch (error) {
+            console.error('加载统计数据失败:', error);
+            showAlert('加载统计数据失败', 'danger');
+        }
+    }
+
+    // 更新图表
+    function updateCharts(stats) {
+        // 文档类型分布图
+        const docTypeCtx = document.getElementById('docTypeChart').getContext('2d');
+
+        if (docTypeChartInstance) {
+            docTypeChartInstance.destroy();
+        }
+
+        const docTypes = Object.keys(stats.documents_by_type);
+        const docCounts = Object.values(stats.documents_by_type);
+
+        docTypeChartInstance = new Chart(docTypeCtx, {
+            type: 'doughnut',
+            data: {
+                labels: docTypes,
+                datasets: [{
+                    data: docCounts,
+                    backgroundColor: [
+                        '#667eea',
+                        '#764ba2',
+                        '#f093fb',
+                        '#4facfe',
+                        '#43e97b',
+                        '#fa709a',
+                        '#fee140',
+                        '#30cfd0'
+                    ],
+                    borderWidth: 2,
+                    borderColor: '#fff'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            padding: 15,
+                            font: {
+                                size: 12
+                            }
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const label = context.label || '';
+                                const value = context.parsed || 0;
+                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                const percentage = total > 0 ? Math.round(value / total * 100) : 0;
+                                return `${label}: ${value} (${percentage}%)`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        // 热门公司图
+        const topCompaniesCtx = document.getElementById('topCompaniesChart').getContext('2d');
+
+        if (topCompaniesChartInstance) {
+            topCompaniesChartInstance.destroy();
+        }
+
+        const companies = stats.top_companies.slice(0, 10);
+        const companyNames = companies.map(c => c.company_name.length > 15
+            ? c.company_name.substring(0, 15) + '...'
+            : c.company_name);
+        const companyCounts = companies.map(c => c.count);
+
+        topCompaniesChartInstance = new Chart(topCompaniesCtx, {
+            type: 'bar',
+            data: {
+                labels: companyNames,
+                datasets: [{
+                    label: '文档数量',
+                    data: companyCounts,
+                    backgroundColor: '#667eea',
+                    borderColor: '#5568d3',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return `文档数: ${context.parsed.y}`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            stepSize: 1
+                        }
+                    },
+                    x: {
+                        ticks: {
+                            maxRotation: 45,
+                            minRotation: 45
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    // 显示最近文档
+    function displayRecentDocuments(documents) {
+        const recentDiv = document.getElementById('recent-documents');
+
+        if (documents.length === 0) {
+            recentDiv.innerHTML = '<p class="text-muted text-center">暂无数据</p>';
+            return;
+        }
+
+        recentDiv.innerHTML = `
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>文档ID</th>
+                            <th>股票代码</th>
+                            <th>公司名称</th>
+                            <th>类型</th>
+                            <th>章节数</th>
+                            <th>创建时间</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${documents.map(doc => `
+                            <tr>
+                                <td><code>${doc.doc_id.substring(0, 12)}...</code></td>
+                                <td><strong>${doc.stock_code}</strong></td>
+                                <td>${doc.company_name}</td>
+                                <td><span class="badge bg-secondary">${doc.document_type}</span></td>
+                                <td><span class="badge bg-info">${doc.section_count}</span></td>
+                                <td><small>${new Date(doc.created_at).toLocaleString()}</small></td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>
+        `;
+    }
+
+    // 显示处理统计
+    function displayProcessingStats(stats) {
+        const processingDiv = document.getElementById('processing-stats');
+
+        const thisWeek = stats.processing_stats.this_week || 0;
+        const total = stats.processing_stats.total || 0;
+        const percentage = total > 0 ? Math.round(thisWeek / total * 100 * 10) / 10 : 0;
+
+        processingDiv.innerHTML = `
+            <div class="mb-3">
+                <div class="d-flex justify-content-between mb-1">
+                    <span>本周处理进度</span>
+                    <span>${thisWeek} / ${total}</span>
+                </div>
+                <div class="progress">
+                    <div class="progress-bar bg-success" style="width: ${percentage}%">
+                        ${percentage}%
+                    </div>
+                </div>
+            </div>
+
+            <div class="row text-center">
+                <div class="col-4">
+                    <h4 class="text-primary">${thisWeek}</h4>
+                    <p class="text-muted mb-0 small">本周新增</p>
+                </div>
+                <div class="col-4">
+                    <h4 class="text-success">${total}</h4>
+                    <p class="text-muted mb-0 small">总文档数</p>
+                </div>
+                <div class="col-4">
+                    <h4 class="text-info">${percentage}%</h4>
+                    <p class="text-muted mb-0 small">本周占比</p>
+                </div>
+            </div>
+
+            <hr>
+
+            <div class="small text-muted">
+                <p class="mb-1">
+                    <i class="fas fa-info-circle me-1"></i>
+                    平均每天处理约 ${Math.round(thisWeek / 7 * 10) / 10} 个文档
+                </p>
+                <p class="mb-0">
+                    <i class="fas fa-calendar me-1"></i>
+                    统计时间：${new Date().toLocaleDateString()}
+                </p>
+            </div>
+        `;
+    }
+
+    // 刷新统计
+    function refreshStats() {
+        loadStats();
+        showAlert('统计数据已刷新', 'info');
+    }
+
+    // 页面加载完成后执行
+    document.addEventListener('DOMContentLoaded', () => {
+        loadStats();
+
+        // 每30秒自动刷新
+        setInterval(() => {
+            loadStats();
+        }, 30000);
+    });
+</script>
+{% endblock %}

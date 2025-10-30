@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}港股公告分析管理系统{% endblock %}</title>
+
+    <!-- Bootstrap 5 -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <!-- DataTables -->
+    <link href="https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css" rel="stylesheet">
+
+    <style>
+        :root {
+            --primary-color: #0066cc;
+            --secondary-color: #6c757d;
+            --success-color: #28a745;
+            --danger-color: #dc3545;
+            --warning-color: #ffc107;
+            --info-color: #17a2b8;
+        }
+
+        body {
+            background-color: #f8f9fa;
+            font-family: 'Microsoft YaHei', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        .navbar-brand {
+            font-weight: bold;
+            font-size: 1.5rem;
+        }
+
+        .sidebar {
+            min-height: calc(100vh - 56px);
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .sidebar .nav-link {
+            color: rgba(255, 255, 255, 0.8);
+            padding: 0.75rem 1.5rem;
+            margin: 0.25rem 0;
+            border-radius: 0.5rem;
+            transition: all 0.3s ease;
+        }
+
+        .sidebar .nav-link:hover {
+            color: white;
+            background-color: rgba(255, 255, 255, 0.1);
+            transform: translateX(5px);
+        }
+
+        .sidebar .nav-link.active {
+            color: white;
+            background-color: rgba(255, 255, 255, 0.2);
+            font-weight: bold;
+        }
+
+        .sidebar .nav-link i {
+            width: 20px;
+            text-align: center;
+            margin-right: 0.5rem;
+        }
+
+        .main-content {
+            padding: 2rem;
+        }
+
+        .card {
+            border: none;
+            border-radius: 0.75rem;
+            box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+            transition: all 0.3s ease;
+        }
+
+        .card:hover {
+            box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+            transform: translateY(-2px);
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 1rem;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .stat-card .stat-icon {
+            font-size: 2.5rem;
+            opacity: 0.8;
+        }
+
+        .stat-card .stat-value {
+            font-size: 2rem;
+            font-weight: bold;
+            margin: 0.5rem 0;
+        }
+
+        .stat-card .stat-label {
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+
+        .btn {
+            border-radius: 0.5rem;
+            padding: 0.5rem 1.5rem;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        .btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 0.25rem 0.5rem rgba(0, 0, 0, 0.15);
+        }
+
+        .table {
+            background-color: white;
+            border-radius: 0.5rem;
+            overflow: hidden;
+        }
+
+        .progress {
+            height: 1.5rem;
+            border-radius: 0.75rem;
+        }
+
+        .badge {
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            font-weight: 500;
+        }
+
+        .status-badge {
+            font-size: 0.85rem;
+        }
+
+        .footer {
+            background-color: white;
+            border-top: 1px solid #dee2e6;
+            padding: 1rem 0;
+            margin-top: 2rem;
+        }
+
+        .alert {
+            border: none;
+            border-radius: 0.5rem;
+            padding: 1rem 1.5rem;
+        }
+
+        .spinner-border-sm {
+            width: 1rem;
+            height: 1rem;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .fade-in {
+            animation: fadeIn 0.5s ease-in;
+        }
+
+        .upload-area {
+            border: 2px dashed #ccc;
+            border-radius: 1rem;
+            padding: 3rem;
+            text-align: center;
+            background-color: #f8f9fa;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .upload-area:hover {
+            border-color: var(--primary-color);
+            background-color: #e9ecef;
+        }
+
+        .upload-area.dragover {
+            border-color: var(--primary-color);
+            background-color: #e7f3ff;
+        }
+
+        .upload-area i {
+            font-size: 3rem;
+            color: var(--primary-color);
+            margin-bottom: 1rem;
+        }
+    </style>
+
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <!-- 导航栏 -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="/">
+                <i class="fas fa-chart-line me-2"></i>
+                港股公告分析管理系统
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <span class="nav-link">
+                            <i class="fas fa-clock me-1"></i>
+                            <span id="current-time"></span>
+                        </span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid">
+        <div class="row">
+            <!-- 侧边栏 -->
+            <div class="col-md-2 p-0">
+                <div class="sidebar">
+                    <nav class="nav flex-column py-3">
+                        <a class="nav-link {% if request.url.path == '/' %}active{% endif %}" href="/">
+                            <i class="fas fa-home"></i>
+                            <span>首页概览</span>
+                        </a>
+                        <a class="nav-link {% if request.url.path == '/upload' %}active{% endif %}" href="/upload">
+                            <i class="fas fa-upload"></i>
+                            <span>文件上传</span>
+                        </a>
+                        <a class="nav-link {% if request.url.path == '/tasks' %}active{% endif %}" href="/tasks">
+                            <i class="fas fa-tasks"></i>
+                            <span>任务管理</span>
+                        </a>
+                        <a class="nav-link {% if request.url.path == '/data' %}active{% endif %}" href="/data">
+                            <i class="fas fa-database"></i>
+                            <span>数据管理</span>
+                        </a>
+                        <a class="nav-link {% if request.url.path == '/stats' %}active{% endif %}" href="/stats">
+                            <i class="fas fa-chart-bar"></i>
+                            <span>统计分析</span>
+                        </a>
+                        <hr class="my-3" style="border-color: rgba(255,255,255,0.2);">
+                        <a class="nav-link" href="/api/docs" target="_blank">
+                            <i class="fas fa-code"></i>
+                            <span>API文档</span>
+                        </a>
+                        <a class="nav-link" href="https://github.com" target="_blank">
+                            <i class="fab fa-github"></i>
+                            <span>GitHub</span>
+                        </a>
+                    </nav>
+                </div>
+            </div>
+
+            <!-- 主内容区 -->
+            <div class="col-md-10">
+                <div class="main-content">
+                    {% block content %}{% endblock %}
+                </div>
+
+                <!-- 页脚 -->
+                <footer class="footer text-center text-muted">
+                    <small>
+                        © 2025 港股公告分析管理系统 | 基于 FastAPI + Bootstrap 5 构建
+                    </small>
+                </footer>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap 5 JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- jQuery -->
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <!-- DataTables -->
+    <script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
+
+    <script>
+        // 更新当前时间
+        function updateTime() {
+            const now = new Date();
+            const timeString = now.toLocaleString('zh-CN', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+            document.getElementById('current-time').textContent = timeString;
+        }
+
+        updateTime();
+        setInterval(updateTime, 1000);
+
+        // 通用AJAX请求函数
+        function apiRequest(url, method = 'GET', data = null) {
+            return fetch(url, {
+                method: method,
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: data ? JSON.stringify(data) : null
+            }).then(response => response.json());
+        }
+
+        // 显示通知
+        function showAlert(message, type = 'info') {
+            const alertDiv = document.createElement('div');
+            alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+            alertDiv.innerHTML = `
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+
+            const container = document.querySelector('.main-content');
+            container.insertBefore(alertDiv, container.firstChild);
+
+            setTimeout(() => {
+                alertDiv.remove();
+            }, 5000);
+        }
+    </script>
+
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

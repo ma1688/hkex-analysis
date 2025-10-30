@@ -1,0 +1,345 @@
+"""
+数据管理服务
+"""
+
+from datetime import datetime, timedelta
+from typing import List, Dict, Any, Optional, Tuple
+import clickhouse_connect
+from pathlib import Path
+import sys
+
+from ..models.schemas import (
+    DocumentInfo, SectionInfo, Statistics,
+    DuplicateFile, CleanupResult
+)
+from src.config.settings import get_settings
+
+settings = get_settings()
+
+class DataService:
+    """数据服务"""
+
+    def __init__(self):
+        self.client = clickhouse_connect.get_client(
+            host=settings.clickhouse_host,
+            port=settings.clickhouse_port,
+            database=settings.clickhouse_database,
+            username=settings.clickhouse_user,
+            password=settings.clickhouse_password
+        )
+
+    def get_documents(
+        self,
+        stock_code: Optional[str] = None,
+        document_type: Optional[str] = None,
+        limit: int = 50,
+        offset: int = 0
+    ) -> Tuple[List[DocumentInfo], int]:
+        """获取文档列表"""
+        query = """
+        SELECT
+            doc_id, stock_code, company_name, document_type,
+            document_subtype, announcement_date, section_count,
+            metadata, created_at
+        FROM documents_v2
+        """
+
+        conditions = []
+        params = {}
+
+        if stock_code:
+            conditions.append("stock_code = {stock_code}")
+            params['stock_code'] = stock_code
+
+        if document_type:
+            conditions.append("document_type = {document_type}")
+            params['document_type'] = document_type
+
+        if conditions:
+            query += " WHERE " + " AND ".join(conditions)
+
+        query += " ORDER BY created_at DESC LIMIT {limit} OFFSET {offset}"
+        params['limit'] = limit
+        params['offset'] = offset
+
+        result = self.client.query(query, parameters=params).result_rows
+
+        # 获取总数
+        count_query = "SELECT count() FROM documents_v2"
+        if conditions:
+            count_query += " WHERE " + " AND ".join(conditions)
+
+        total = self.client.query(count_query, parameters=params).result_rows[0][0]
+
+        documents = []
+        for row in result:
+            doc = DocumentInfo(
+                doc_id=row[0],
+                stock_code=row[1],
+                company_name=row[2],
+                document_type=row[3],
+                document_subtype=row[4],
+                announcement_date=row[5],
+                section_count=row[6],
+                metadata=eval(row[7]) if row[7] else {},
+                created_at=row[8]
+            )
+            documents.append(doc)
+
+        return documents, total
+
+    def get_document(self, doc_id: str) -> Optional[DocumentInfo]:
+        """获取单个文档"""
+        query = """
+        SELECT
+            doc_id, stock_code, company_name, document_type,
+            document_subtype, announcement_date, section_count,
+            metadata, created_at
+        FROM documents_v2
+        WHERE doc_id = {doc_id}
+        """
+
+        result = self.client.query(query, parameters={'doc_id': doc_id}).result_rows
+
+        if not result:
+            return None
+
+        row = result[0]
+        return DocumentInfo(
+            doc_id=row[0],
+            stock_code=row[1],
+            company_name=row[2],
+            document_type=row[3],
+            document_subtype=row[4],
+            announcement_date=row[5],
+            section_count=row[6],
+            metadata=eval(row[7]) if row[7] else {},
+            created_at=row[8]
+        )
+
+    def get_sections(self, doc_id: str, limit: int = 100) -> List[SectionInfo]:
+        """获取章节列表"""
+        query = """
+        SELECT
+            section_id, doc_id, section_type, section_title,
+            section_index, content, char_count, metadata
+        FROM document_sections
+        WHERE doc_id = {doc_id}
+        ORDER BY section_index
+        LIMIT {limit}
+        """
+
+        result = self.client.query(
+            query,
+            parameters={'doc_id': doc_id, 'limit': limit}
+        ).result_rows
+
+        sections = []
+        for row in result:
+            section = SectionInfo(
+                section_id=row[0],
+                doc_id=row[1],
+                section_type=row[2],
+                section_title=row[3],
+                section_index=row[4],
+                content=row[5],
+                char_count=row[6],
+                metadata=eval(row[7]) if row[7] else {}
+            )
+            sections.append(section)
+
+        return sections
+
+    def get_statistics(self) -> Statistics:
+        """获取统计数据"""
+        # 总文档数
+        total_documents = self.client.query(
+            "SELECT count() FROM documents_v2"
+        ).result_rows[0][0]
+
+        # 总章节数
+        total_sections = self.client.query(
+            "SELECT count() FROM document_sections"
+        ).result_rows[0][0]
+
+        # 按类型统计
+        documents_by_type = {}
+        type_result = self.client.query("""
+            SELECT document_type, count() as cnt
+            FROM documents_v2
+            GROUP BY document_type
+        """).result_rows
+
+        for row in type_result:
+            documents_by_type[row[0]] = row[1]
+
+        # 最近文档
+        recent_docs, _ = self.get_documents(limit=10)
+        recent_documents = recent_docs
+
+        # 热门公司
+        top_companies = []
+        company_result = self.client.query("""
+            SELECT company_name, count(*) as cnt
+            FROM documents_v2
+            GROUP BY company_name
+            ORDER BY cnt DESC
+            LIMIT 10
+        """).result_rows
+
+        for row in company_result:
+            top_companies.append({
+                'company_name': row[0],
+                'count': row[1]
+            })
+
+        # 处理统计
+        last_week = datetime.now() - timedelta(days=7)
+        query_str = """
+            SELECT count()
+            FROM documents_v2
+            WHERE created_at >= toDateTime({last_week})
+        """
+        processing_stats = {
+            'this_week': self.client.query(
+                query_str,
+                parameters={'last_week': last_week.strftime('%Y-%m-%d %H:%M:%S')}
+            ).result_rows[0][0],
+            'total': total_documents
+        }
+
+        return Statistics(
+            total_documents=total_documents,
+            total_sections=total_sections,
+            documents_by_type=documents_by_type,
+            documents_by_status={},
+            recent_documents=recent_documents,
+            top_companies=top_companies,
+            processing_stats=processing_stats
+        )
+
+    def check_duplicates(self) -> CleanupResult:
+        """检查重复数据"""
+        duplicates_query = """
+        SELECT
+            file_path,
+            groupArray(doc_id) as doc_ids,
+            count() as cnt
+        FROM documents_v2
+        GROUP BY file_path
+        HAVING cnt > 1
+        ORDER BY cnt DESC
+        """
+
+        duplicates = self.client.query(duplicates_query).result_rows
+
+        if not duplicates:
+            return CleanupResult(
+                dry_run=True,
+                duplicates_found=0,
+                files_to_delete=[],
+                total_records_to_delete=0
+            )
+
+        files_to_delete = []
+
+        for file_path, doc_ids, count in duplicates:
+            # 查询创建时间，保留最新的
+            # ClickHouse IN子句不支持参数化，需要手动构建
+            in_clause = ','.join([f"'{d}'" for d in doc_ids])
+            time_query = f"""
+            SELECT doc_id, created_at
+            FROM documents_v2
+            WHERE doc_id IN ({in_clause})
+            ORDER BY created_at DESC
+            """
+
+            records = self.client.query(time_query).result_rows
+            keep_doc_id = records[0][0] if records else doc_ids[0]
+            delete_doc_ids = [r[0] for r in records[1:]] if len(records) > 1 else doc_ids[1:]
+
+            duplicate_file = DuplicateFile(
+                file_path=file_path,
+                doc_ids=doc_ids,
+                count=count,
+                keep_doc_id=keep_doc_id,
+                delete_doc_ids=delete_doc_ids
+            )
+            files_to_delete.append(duplicate_file)
+
+        total_to_delete = sum(len(f.delete_doc_ids) for f in files_to_delete)
+
+        return CleanupResult(
+            dry_run=True,
+            duplicates_found=len(duplicates),
+            files_to_delete=files_to_delete,
+            total_records_to_delete=total_to_delete
+        )
+
+    def cleanup_duplicates(self, dry_run: bool = True) -> CleanupResult:
+        """清理重复数据"""
+        if dry_run:
+            return self.check_duplicates()
+
+        result = self.check_duplicates()
+
+        for file_info in result.files_to_delete:
+            for doc_id in file_info.delete_doc_ids:
+                # 先删除章节
+                self.client.command(
+                    f"ALTER TABLE document_sections DELETE WHERE doc_id = '{doc_id}'"
+                )
+                # 再删除文档
+                self.client.command(
+                    f"ALTER TABLE documents_v2 DELETE WHERE doc_id = '{doc_id}'"
+                )
+
+        # 优化表
+        self.client.command("OPTIMIZE TABLE documents_v2 FINAL")
+        self.client.command("OPTIMIZE TABLE document_sections FINAL")
+
+        return CleanupResult(
+            dry_run=False,
+            duplicates_found=result.duplicates_found,
+            files_to_delete=result.files_to_delete,
+            total_records_to_delete=result.total_records_to_delete
+        )
+
+    def search_documents(self, query: str, limit: int = 50) -> List[DocumentInfo]:
+        """搜索文档"""
+        search_query = """
+        SELECT
+            doc_id, stock_code, company_name, document_type,
+            document_subtype, announcement_date, section_count,
+            metadata, created_at
+        FROM documents_v2
+        WHERE company_name ILIKE {search_pattern}
+           OR stock_code = {stock_code}
+        ORDER BY created_at DESC
+        LIMIT {limit}
+        """
+
+        result = self.client.query(
+            search_query,
+            parameters=[f'%{query}%', query, limit]
+        ).result_rows
+
+        documents = []
+        for row in result:
+            doc = DocumentInfo(
+                doc_id=row[0],
+                stock_code=row[1],
+                company_name=row[2],
+                document_type=row[3],
+                document_subtype=row[4],
+                announcement_date=row[5],
+                section_count=row[6],
+                metadata=eval(row[7]) if row[7] else {},
+                created_at=row[8]
+            )
+            documents.append(doc)
+
+        return documents
+
+# 全局数据服务实例
+data_service = DataService()

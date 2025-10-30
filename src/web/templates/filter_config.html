@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>过滤规则配置 - 港股公告分析管理系统</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body class="bg-gray-50">
+    <!-- 导航栏 -->
+    <nav class="bg-blue-600 text-white shadow-lg">
+        <div class="container mx-auto px-4">
+            <div class="flex items-center justify-between h-16">
+                <div class="flex items-center space-x-4">
+                    <i class="fas fa-file-filter text-2xl"></i>
+                    <h1 class="text-xl font-bold">过滤规则配置</h1>
+                </div>
+                <div class="flex space-x-4">
+                    <a href="/" class="hover:bg-blue-700 px-3 py-2 rounded">
+                        <i class="fas fa-home mr-2"></i>首页
+                    </a>
+                    <a href="/upload" class="hover:bg-blue-700 px-3 py-2 rounded">
+                        <i class="fas fa-upload mr-2"></i>上传
+                    </a>
+                    <a href="/tasks" class="hover:bg-blue-700 px-3 py-2 rounded">
+                        <i class="fas fa-tasks mr-2"></i>任务
+                    </a>
+                    <a href="/data" class="hover:bg-blue-700 px-3 py-2 rounded">
+                        <i class="fas fa-database mr-2"></i>数据
+                    </a>
+                    <a href="/stats" class="hover:bg-blue-700 px-3 py-2 rounded">
+                        <i class="fas fa-chart-bar mr-2"></i>统计
+                    </a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mx-auto px-4 py-8">
+        <!-- 页面标题 -->
+        <div class="mb-8">
+            <h2 class="text-3xl font-bold text-gray-800 mb-2">文档过滤规则配置</h2>
+            <p class="text-gray-600">自定义文档过滤规则，支持基于文档类型、关键词、正则表达式等多种过滤方式</p>
+        </div>
+
+        <!-- 操作按钮 -->
+        <div class="mb-6 flex space-x-4">
+            <button id="btn-load-config" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded flex items-center">
+                <i class="fas fa-refresh mr-2"></i>加载配置
+            </button>
+            <button id="btn-save-config" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded flex items-center">
+                <i class="fas fa-save mr-2"></i>保存配置
+            </button>
+            <button id="btn-validate-config" class="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded flex items-center">
+                <i class="fas fa-check mr-2"></i>验证配置
+            </button>
+            <button id="btn-reset-default" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded flex items-center">
+                <i class="fas fa-undo mr-2"></i>重置默认
+            </button>
+        </div>
+
+        <!-- 配置模板 -->
+        <div class="mb-8 bg-white rounded-lg shadow p-6">
+            <h3 class="text-xl font-semibold mb-4">
+                <i class="fas fa-layer-group mr-2 text-blue-500"></i>快速配置模板
+            </h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="border border-gray-200 rounded-lg p-4">
+                    <h4 class="font-semibold text-lg mb-2">严格模式</h4>
+                    <p class="text-gray-600 text-sm mb-3">只处理明确的业务相关文档，其他全部跳过</p>
+                    <button id="btn-apply-strict" class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-sm">
+                        应用此模板
+                    </button>
+                </div>
+                <div class="border border-gray-200 rounded-lg p-4">
+                    <h4 class="font-semibold text-lg mb-2">宽松模式</h4>
+                    <p class="text-gray-600 text-sm mb-3">处理所有非明确跳过类型的文档</p>
+                    <button id="btn-apply-inclusive" class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-sm">
+                        应用此模板
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 过滤模式 -->
+        <div class="mb-8 bg-white rounded-lg shadow p-6">
+            <h3 class="text-xl font-semibold mb-4">
+                <i class="fas fa-filter mr-2 text-blue-500"></i>过滤模式
+            </h3>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">选择过滤模式</label>
+                    <select id="filter-mode" class="w-full border border-gray-300 rounded-md px-3 py-2">
+                        <option value="hybrid">混合模式（推荐）- 白名单优先，然后应用黑名单</option>
+                        <option value="whitelist">白名单模式 - 只处理匹配白名单的文档</option>
+                        <option value="blacklist">黑名单模式 - 跳过匹配黑名单的文档</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- 文档类型过滤 -->
+        <div class="mb-8 bg-white rounded-lg shadow p-6">
+            <h3 class="text-xl font-semibold mb-4">
+                <i class="fas fa-file-alt mr-2 text-blue-500"></i>文档类型过滤
+            </h3>
+
+            <!-- 白名单 -->
+            <div class="mb-6">
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                    白名单（勾选要处理的文档类型）
+                </label>
+                <div id="whitelist-types" class="grid grid-cols-2 md:grid-cols-4 gap-2">
+                    <!-- 动态生成 -->
+                </div>
+            </div>
+
+            <!-- 黑名单 -->
+            <div class="mb-6">
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                    黑名单（勾选要跳过的文档类型）
+                </label>
+                <div id="blacklist-types" class="grid grid-cols-2 md:grid-cols-4 gap-2">
+                    <!-- 动态生成 -->
+                </div>
+            </div>
+
+            <!-- 默认动作 -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">未指定类型的默认动作</label>
+                <div class="flex space-x-4">
+                    <label class="flex items-center">
+                        <input type="radio" name="default_action" value="process" class="mr-2">
+                        <span>处理</span>
+                    </label>
+                    <label class="flex items-center">
+                        <input type="radio" name="default_action" value="skip" class="mr-2">
+                        <span>跳过</span>
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <!-- 关键词过滤 -->
+        <div class="mb-8 bg-white rounded-lg shadow p-6">
+            <h3 class="text-xl font-semibold mb-4">
+                <i class="fas fa-key mr-2 text-blue-500"></i>关键词过滤
+            </h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- 黑名单关键词 -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                        黑名单关键词（每行一个）
+                    </label>
+                    <textarea id="blacklist-keywords" class="w-full border border-gray-300 rounded-md px-3 py-2 h-48"
+                              placeholder="输入要跳过的关键词，每行一个"></textarea>
+                    <p class="text-xs text-gray-500 mt-1">包含这些关键词的文档会被跳过</p>
+                </div>
+
+                <!-- 白名单关键词 -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                        白名单关键词（每行一个）
+                    </label>
+                    <textarea id="whitelist-keywords" class="w-full border border-gray-300 rounded-md px-3 py-2 h-48"
+                              placeholder="输入要优先处理的关键词，每行一个"></textarea>
+                    <p class="text-xs text-gray-500 mt-1">包含这些关键词的文档会被优先处理</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 特殊规则 -->
+        <div class="mb-8 bg-white rounded-lg shadow p-6">
+            <h3 class="text-xl font-semibold mb-4">
+                <i class="fas fa-star mr-2 text-blue-500"></i>特殊规则
+            </h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                        强制处理模式（每行一个）
+                    </label>
+                    <textarea id="force-process" class="w-full border border-gray-300 rounded-md px-3 py-2 h-32"
+                              placeholder="无论其他规则如何，都会处理的模式"></textarea>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                        强制跳过模式（每行一个）
+                    </label>
+                    <textarea id="force-skip" class="w-full border border-gray-300 rounded-md px-3 py-2 h-32"
+                              placeholder="无论其他规则如何，都会跳过的模式"></textarea>
+                </div>
+            </div>
+        </div>
+
+        <!-- 验证结果 -->
+        <div id="validation-result" class="hidden mb-8 bg-white rounded-lg shadow p-6">
+            <h3 class="text-xl font-semibold mb-4">
+                <i class="fas fa-check-circle mr-2 text-green-500"></i>验证结果
+            </h3>
+            <div id="validation-content">
+                <!-- 动态内容 -->
+            </div>
+        </div>
+
+        <!-- 状态栏 -->
+        <div id="status-bar" class="fixed bottom-4 right-4 max-w-sm">
+            <!-- 动态内容 -->
+        </div>
+    </div>
+
+    <script>
+        // 文档类型映射
+        const documentTypes = {
+            "rights": "供股",
+            "placing": "配售",
+            "ipo": "IPO",
+            "consolidation": "合股/拆股",
+            "split": "拆股",
+            "acquisition": "收购",
+            "disposal": "出售",
+            "disclosable_transaction": "须予披露交易",
+            "connected_transaction": "关连交易",
+            "very_substantial_acquisition": "非常重大收购",
+            "very_substantial_disposal": "非常重大出售",
+            "share_option": "购股权计划",
+            "dividend": "股息分派",
+            "capital_reduction": "股本缩减",
+            "share_repurchase": "股份回购",
+            "other": "其他"
+        };
+
+        // 页面初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeDocumentTypeCheckboxes();
+            loadConfig();
+
+            // 绑定事件
+            document.getElementById('btn-load-config').addEventListener('click', loadConfig);
+            document.getElementById('btn-save-config').addEventListener('click', saveConfig);
+            document.getElementById('btn-validate-config').addEventListener('click', validateConfig);
+            document.getElementById('btn-reset-default').addEventListener('click', resetToDefault);
+            document.getElementById('btn-apply-strict').addEventListener('click', () => applyTemplate('strict'));
+            document.getElementById('btn-apply-inclusive').addEventListener('click', () => applyTemplate('inclusive'));
+        });
+
+        // 初始化文档类型复选框
+        function initializeDocumentTypeCheckboxes() {
+            const whitelistDiv = document.getElementById('whitelist-types');
+            const blacklistDiv = document.getElementById('blacklist-types');
+
+            for (const [key, value] of Object.entries(documentTypes)) {
+                // 白名单复选框
+                const whitelistCheckbox = createCheckbox(key, value, 'whitelist');
+                whitelistDiv.appendChild(whitelistCheckbox);
+
+                // 黑名单复选框
+                const blacklistCheckbox = createCheckbox(key, value, 'blacklist');
+                blacklistDiv.appendChild(blacklistCheckbox);
+            }
+        }
+
+        // 创建复选框
+        function createCheckbox(value, label, group) {
+            const labelDiv = document.createElement('label');
+            labelDiv.className = 'flex items-center p-2 border border-gray-200 rounded hover:bg-gray-50 cursor-pointer';
+            labelDiv.innerHTML = `
+                <input type="checkbox" value="${value}" class="mr-2" data-group="${group}">
+                <span class="text-sm">${label}</span>
+            `;
+            return labelDiv;
+        }
+
+        // 显示状态消息
+        function showStatus(message, type = 'info') {
+            const statusBar = document.getElementById('status-bar');
+            const alertClass = {
+                'success': 'bg-green-500',
+                'error': 'bg-red-500',
+                'warning': 'bg-yellow-500',
+                'info': 'bg-blue-500'
+            }[type] || 'bg-blue-500';
+
+            statusBar.innerHTML = `
+                <div class="${alertClass} text-white px-4 py-2 rounded shadow-lg">
+                    <i class="fas fa-${type === 'success' ? 'check' : type === 'error' ? 'times' : type === 'warning' ? 'exclamation' : 'info'}-circle mr-2"></i>
+                    ${message}
+                </div>
+            `;
+
+            setTimeout(() => {
+                statusBar.innerHTML = '';
+            }, 5000);
+        }
+
+        // 加载配置
+        async function loadConfig() {
+            try {
+                const response = await fetch('/filter-config/');
+                const result = await response.json();
+
+                if (result.status === 'success') {
+                    const config = result.config;
+                    applyConfigToUI(config);
+                    showStatus('配置加载成功', 'success');
+                } else {
+                    throw new Error(result.detail || '加载配置失败');
+                }
+            } catch (error) {
+                showStatus(`加载配置失败: ${error.message}`, 'error');
+            }
+        }
+
+        // 应用配置到UI
+        function applyConfigToUI(config) {
+            // 过滤模式
+            document.getElementById('filter-mode').value = config.filter_mode?.mode || 'hybrid';
+
+            // 文档类型
+            const whitelist = config.document_types?.whitelist || [];
+            const blacklist = config.document_types?.blacklist || [];
+            const defaultAction = config.document_types?.default_action || 'skip';
+
+            document.querySelectorAll('input[data-group="whitelist"]').forEach(checkbox => {
+                checkbox.checked = whitelist.includes(checkbox.value);
+            });
+
+            document.querySelectorAll('input[data-group="blacklist"]').forEach(checkbox => {
+                checkbox.checked = blacklist.includes(checkbox.value);
+            });
+
+            document.querySelector(`input[name="default_action"][value="${defaultAction}"]`).checked = true;
+
+            // 关键词
+            document.getElementById('blacklist-keywords').value =
+                (config.keyword_filters?.blacklist || []).join('\n');
+            document.getElementById('whitelist-keywords').value =
+                (config.keyword_filters?.whitelist || []).join('\n');
+
+            // 特殊规则
+            document.getElementById('force-process').value =
+                (config.special_rules?.force_process_patterns || []).join('\n');
+            document.getElementById('force-skip').value =
+                (config.special_rules?.force_skip_patterns || []).join('\n');
+        }
+
+        // 从UI收集配置
+        function collectConfigFromUI() {
+            // 过滤模式
+            const filterMode = document.getElementById('filter-mode').value;
+
+            // 文档类型
+            const whitelist = [];
+            const blacklist = [];
+            document.querySelectorAll('input[data-group="whitelist"]:checked').forEach(checkbox => {
+                whitelist.push(checkbox.value);
+            });
+            document.querySelectorAll('input[data-group="blacklist"]:checked').forEach(checkbox => {
+                blacklist.push(checkbox.value);
+            });
+            const defaultAction = document.querySelector('input[name="default_action"]:checked').value;
+
+            // 关键词
+            const blacklistKeywords = document.getElementById('blacklist-keywords').value
+                .split('\n').filter(k => k.trim());
+            const whitelistKeywords = document.getElementById('whitelist-keywords').value
+                .split('\n').filter(k => k.trim());
+
+            // 特殊规则
+            const forceProcess = document.getElementById('force-process').value
+                .split('\n').filter(k => k.trim());
+            const forceSkip = document.getElementById('force-skip').value
+                .split('\n').filter(k => k.trim());
+
+            return {
+                filter_mode: { mode: filterMode },
+                document_types: {
+                    whitelist: whitelist,
+                    blacklist: blacklist,
+                    default_action: defaultAction
+                },
+                keyword_filters: {
+                    blacklist: blacklistKeywords,
+                    whitelist: whitelistKeywords,
+                    enabled: true
+                },
+                special_rules: {
+                    force_process_patterns: forceProcess,
+                    force_skip_patterns: forceSkip,
+                    enabled: true
+                },
+                pattern_filters: {
+                    blacklist_patterns: [],
+                    whitelist_patterns: [],
+                    enabled: true
+                },
+                file_filters: {
+                    size: { enabled: false },
+                    date: { enabled: false },
+                    filename_length: { enabled: false }
+                },
+                logging: {
+                    verbose: true,
+                    log_decisions: true
+                },
+                cache: {
+                    enabled: true,
+                    ttl: 3600
+                }
+            };
+        }
+
+        // 保存配置
+        async function saveConfig() {
+            try {
+                const config = collectConfigFromUI();
+                const response = await fetch('/filter-config/', {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(config)
+                });
+
+                const result = await response.json();
+
+                if (result.status === 'success') {
+                    showStatus('配置保存成功', 'success');
+                } else {
+                    throw new Error(result.detail || '保存配置失败');
+                }
+            } catch (error) {
+                showStatus(`保存配置失败: ${error.message}`, 'error');
+            }
+        }
+
+        // 验证配置
+        async function validateConfig() {
+            try {
+                const config = collectConfigFromUI();
+                const response = await fetch('/filter-config/validate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(config)
+                });
+
+                const result = await response.json();
+
+                if (result.status === 'success') {
+                    showValidationResult(result);
+                    if (result.valid) {
+                        showStatus('配置验证通过', 'success');
+                    } else {
+                        showStatus('配置验证失败', 'warning');
+                    }
+                } else {
+                    throw new Error(result.detail || '验证配置失败');
+                }
+            } catch (error) {
+                showStatus(`验证配置失败: ${error.message}`, 'error');
+            }
+        }
+
+        // 显示验证结果
+        function showValidationResult(result) {
+            const validationDiv = document.getElementById('validation-result');
+            const contentDiv = document.getElementById('validation-content');
+
+            let html = '';
+
+            if (result.valid) {
+                html += `
+                    <div class="bg-green-50 border border-green-200 rounded-md p-4 mb-4">
+                        <div class="flex">
+                            <i class="fas fa-check-circle text-green-400 mr-3"></i>
+                            <div>
+                                <h4 class="text-green-800 font-medium">配置有效</h4>
+                                <p class="text-green-700 text-sm">所有规则都通过了验证</p>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            } else {
+                html += `
+                    <div class="bg-red-50 border border-red-200 rounded-md p-4 mb-4">
+                        <div class="flex">
+                            <i class="fas fa-times-circle text-red-400 mr-3"></i>
+                            <div>
+                                <h4 class="text-red-800 font-medium">配置有误</h4>
+                                <p class="text-red-700 text-sm">请修复以下错误后重试</p>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            if (result.errors && result.errors.length > 0) {
+                html += '<h5 class="font-semibold text-red-700 mb-2">错误:</h5><ul class="list-disc list-inside mb-4">';
+                result.errors.forEach(error => {
+                    html += `<li class="text-red-600 text-sm">${error}</li>`;
+                });
+                html += '</ul>';
+            }
+
+            if (result.warnings && result.warnings.length > 0) {
+                html += '<h5 class="font-semibold text-yellow-700 mb-2">警告:</h5><ul class="list-disc list-inside">';
+                result.warnings.forEach(warning => {
+                    html += `<li class="text-yellow-600 text-sm">${warning}</li>`;
+                });
+                html += '</ul>';
+            }
+
+            contentDiv.innerHTML = html;
+            validationDiv.classList.remove('hidden');
+        }
+
+        // 重置为默认
+        async function resetToDefault() {
+            if (!confirm('确定要重置为默认配置吗？这将覆盖当前所有自定义设置。')) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/filter-config/reset', {
+                    method: 'POST'
+                });
+
+                const result = await response.json();
+
+                if (result.status === 'success') {
+                    await loadConfig();
+                    showStatus('已重置为默认配置', 'success');
+                } else {
+                    throw new Error(result.detail || '重置配置失败');
+                }
+            } catch (error) {
+                showStatus(`重置配置失败: ${error.message}`, 'error');
+            }
+        }
+
+        // 应用模板
+        async function applyTemplate(templateName) {
+            if (!confirm(`确定要应用"${templateName}"模板吗？这将覆盖当前配置。`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/filter-config/apply-template', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ template_name: templateName })
+                });
+
+                const result = await response.json();
+
+                if (result.status === 'success') {
+                    await loadConfig();
+                    showStatus(result.message, 'success');
+                } else {
+                    throw new Error(result.detail || '应用模板失败');
+                }
+            } catch (error) {
+                showStatus(`应用模板失败: ${error.message}`, 'error');
+            }
+        }
+    </script>
+</body>
+</html>

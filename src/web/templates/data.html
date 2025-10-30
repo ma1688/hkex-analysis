@@ -1,0 +1,565 @@
+{% extends "base.html" %}
+
+{% block title %}数据管理 - 港股公告分析管理系统{% endblock %}
+
+{% block content %}
+<div class="fade-in">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="fas fa-database me-2"></i>数据管理</h2>
+        <div>
+            <button class="btn btn-outline-primary" onclick="refreshData()">
+                <i class="fas fa-sync-alt me-1"></i>刷新
+            </button>
+            <button class="btn btn-warning ms-2" onclick="showCleanupModal()">
+                <i class="fas fa-broom me-1"></i>清理重复数据
+            </button>
+        </div>
+    </div>
+
+    <!-- 数据统计 -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h3 class="text-primary" id="total-documents">-</h3>
+                    <p class="text-muted mb-0">总文档数</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h3 class="text-success" id="total-sections">-</h3>
+                    <p class="text-muted mb-0">总章节数</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h3 class="text-info" id="recent-docs">-</h3>
+                    <p class="text-muted mb-0">本周新增</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h3 class="text-warning" id="duplicate-count">-</h3>
+                    <p class="text-muted mb-0">重复文件</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 搜索和筛选 -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-4">
+                    <label class="form-label">搜索关键词</label>
+                    <input type="text" class="form-control" id="search-input" placeholder="公司名称或股票代码">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">股票代码</label>
+                    <input type="text" class="form-control" id="stock-filter" placeholder="例如：00328">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">文档类型</label>
+                    <select class="form-select" id="type-filter">
+                        <option value="">全部类型</option>
+                        <option value="rights">供股</option>
+                        <option value="placing">配售</option>
+                        <option value="ipo">IPO</option>
+                        <option value="consolidation">合股</option>
+                        <option value="other">其他</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">&nbsp;</label>
+                    <div>
+                        <button class="btn btn-primary" onclick="applyFilters()">
+                            <i class="fas fa-search me-1"></i>搜索
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 文档列表 -->
+    <div class="card">
+        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">
+                <i class="fas fa-list me-2"></i>文档列表
+            </h5>
+            <span class="badge bg-light text-dark" id="doc-count">0 条记录</span>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover" id="documents-table">
+                    <thead>
+                        <tr>
+                            <th>文档ID</th>
+                            <th>股票代码</th>
+                            <th>公司名称</th>
+                            <th>文档类型</th>
+                            <th>公告日期</th>
+                            <th>章节数</th>
+                            <th>创建时间</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="documents-tbody">
+                        <tr>
+                            <td colspan="8" class="text-center">
+                                <div class="spinner-border"></div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <nav aria-label="分页导航">
+                <ul class="pagination justify-content-center" id="pagination"></ul>
+            </nav>
+        </div>
+    </div>
+</div>
+
+<!-- 文档详情模态框 -->
+<div class="modal fade" id="documentModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">文档详情</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="document-modal-body">
+                <div class="text-center">
+                    <div class="spinner-border"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 清理重复数据模态框 -->
+<div class="modal fade" id="cleanupModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-warning">
+                <h5 class="modal-title">清理重复数据</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="cleanup-modal-body">
+                <div class="text-center">
+                    <div class="spinner-border"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-danger" id="execute-cleanup-btn" style="display: none;">
+                    <i class="fas fa-trash me-1"></i>执行清理
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let allDocuments = [];
+    let currentPage = 1;
+    const pageSize = 20;
+
+    // 加载统计数据
+    async function loadStats() {
+        try {
+            const response = await fetch('/stats/');
+            const stats = await response.json();
+
+            document.getElementById('total-documents').textContent = stats.total_documents;
+            document.getElementById('total-sections').textContent = stats.total_sections;
+            document.getElementById('recent-docs').textContent = stats.processing_stats.this_week;
+
+            // 检查重复数据
+            const duplicateResponse = await fetch('/data/cleanup/duplicates/preview');
+            const duplicateData = await duplicateResponse.json();
+
+            document.getElementById('duplicate-count').textContent = duplicateData.duplicates_found;
+
+        } catch (error) {
+            console.error('加载统计数据失败:', error);
+        }
+    }
+
+    // 加载文档列表
+    async function loadDocuments(page = 1) {
+        try {
+            const stockCode = document.getElementById('stock-filter').value;
+            const documentType = document.getElementById('type-filter').value;
+
+            let url = `/data/documents?limit=${pageSize}&offset=${(page - 1) * pageSize}`;
+            if (stockCode) url += `&stock_code=${stockCode}`;
+            if (documentType) url += `&document_type=${documentType}`;
+
+            const response = await fetch(url);
+            const data = await response.json();
+
+            allDocuments = data.documents;
+            currentPage = page;
+
+            displayDocuments(data.documents);
+            displayPagination(data.total, page);
+
+        } catch (error) {
+            console.error('加载文档列表失败:', error);
+            showAlert('加载文档列表失败', 'danger');
+        }
+    }
+
+    // 显示文档列表
+    function displayDocuments(documents) {
+        const tbody = document.getElementById('documents-tbody');
+        const docCount = document.getElementById('doc-count');
+
+        docCount.textContent = `${documents.length} 条记录`;
+
+        if (documents.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="8" class="text-center text-muted">
+                        <i class="fas fa-inbox fa-3x mb-3 d-block"></i>
+                        暂无数据
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+
+        tbody.innerHTML = documents.map(doc => `
+            <tr>
+                <td>
+                    <code>${doc.doc_id.substring(0, 12)}...</code>
+                </td>
+                <td>
+                    <strong>${doc.stock_code}</strong>
+                </td>
+                <td>
+                    <span class="text-truncate d-inline-block" style="max-width: 200px;" title="${doc.company_name}">
+                        ${doc.company_name}
+                    </span>
+                </td>
+                <td>
+                    <span class="badge bg-secondary">${doc.document_type}</span>
+                </td>
+                <td>
+                    ${new Date(doc.announcement_date).toLocaleDateString()}
+                </td>
+                <td>
+                    <span class="badge bg-info">${doc.section_count}</span>
+                </td>
+                <td>
+                    <small>${new Date(doc.created_at).toLocaleString()}</small>
+                </td>
+                <td>
+                    <button class="btn btn-sm btn-outline-primary" onclick="viewDocument('${doc.doc_id}')" title="查看详情">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                </td>
+            </tr>
+        `).join('');
+    }
+
+    // 显示分页
+    function displayPagination(total, current) {
+        const totalPages = Math.ceil(total / pageSize);
+        const pagination = document.getElementById('pagination');
+
+        if (totalPages <= 1) {
+            pagination.innerHTML = '';
+            return;
+        }
+
+        let html = '';
+
+        // 上一页
+        html += `
+            <li class="page-item ${current === 1 ? 'disabled' : ''}">
+                <a class="page-link" href="#" onclick="loadDocuments(${current - 1})">上一页</a>
+            </li>
+        `;
+
+        // 页码
+        for (let i = 1; i <= totalPages; i++) {
+            if (i === 1 || i === totalPages || (i >= current - 2 && i <= current + 2)) {
+                html += `
+                    <li class="page-item ${i === current ? 'active' : ''}">
+                        <a class="page-link" href="#" onclick="loadDocuments(${i})">${i}</a>
+                    </li>
+                `;
+            } else if (i === current - 3 || i === current + 3) {
+                html += '<li class="page-item disabled"><span class="page-link">...</span></li>';
+            }
+        }
+
+        // 下一页
+        html += `
+            <li class="page-item ${current === totalPages ? 'disabled' : ''}">
+                <a class="page-link" href="#" onclick="loadDocuments(${current + 1})">下一页</a>
+            </li>
+        `;
+
+        pagination.innerHTML = html;
+    }
+
+    // 搜索文档
+    async function searchDocuments() {
+        const query = document.getElementById('search-input').value.trim();
+
+        if (!query) {
+            loadDocuments(1);
+            return;
+        }
+
+        try {
+            const response = await fetch(`/data/search?q=${encodeURIComponent(query)}&limit=100`);
+            const documents = await response.json();
+
+            const tbody = document.getElementById('documents-tbody');
+            const docCount = document.getElementById('doc-count');
+
+            docCount.textContent = `${documents.length} 条记录（搜索结果）`;
+
+            if (documents.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="8" class="text-center text-muted">
+                            未找到匹配的数据
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            tbody.innerHTML = documents.map(doc => `
+                <tr>
+                    <td><code>${doc.doc_id.substring(0, 12)}...</code></td>
+                    <td><strong>${doc.stock_code}</strong></td>
+                    <td>${doc.company_name}</td>
+                    <td><span class="badge bg-secondary">${doc.document_type}</span></td>
+                    <td>${new Date(doc.announcement_date).toLocaleDateString()}</td>
+                    <td><span class="badge bg-info">${doc.section_count}</span></td>
+                    <td><small>${new Date(doc.created_at).toLocaleString()}</small></td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-primary" onclick="viewDocument('${doc.doc_id}')">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+
+            document.getElementById('pagination').innerHTML = '';
+
+        } catch (error) {
+            console.error('搜索失败:', error);
+            showAlert('搜索失败', 'danger');
+        }
+    }
+
+    // 应用筛选
+    function applyFilters() {
+        loadDocuments(1);
+    }
+
+    // 查看文档详情
+    async function viewDocument(docId) {
+        const modal = new bootstrap.Modal(document.getElementById('documentModal'));
+        modal.show();
+
+        try {
+            // 加载文档信息
+            const docResponse = await fetch(`/data/documents/${docId}`);
+            const doc = await docResponse.json();
+
+            // 加载章节信息
+            const sectionsResponse = await fetch(`/data/documents/${docId}/sections?limit=50`);
+            const sections = await sectionsResponse.json();
+
+            const modalBody = document.getElementById('document-modal-body');
+
+            modalBody.innerHTML = `
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <h6 class="text-muted mb-2">基本信息</h6>
+                        <p><strong>文档ID：</strong><br><code>${doc.doc_id}</code></p>
+                        <p><strong>股票代码：</strong><br>${doc.stock_code}</p>
+                        <p><strong>公司名称：</strong><br>${doc.company_name}</p>
+                        <p><strong>文档类型：</strong><br>${doc.document_type} - ${doc.document_subtype}</p>
+                    </div>
+                    <div class="col-md-6">
+                        <h6 class="text-muted mb-2">时间信息</h6>
+                        <p><strong>公告日期：</strong><br>${new Date(doc.announcement_date).toLocaleDateString()}</p>
+                        <p><strong>创建时间：</strong><br>${new Date(doc.created_at).toLocaleString()}</p>
+                        <p><strong>章节数：</strong><br><span class="badge bg-info">${doc.section_count}</span></p>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <h6 class="text-muted mb-2">元数据</h6>
+                    <pre class="bg-light p-3 rounded"><code>${JSON.stringify(doc.metadata, null, 2)}</code></pre>
+                </div>
+
+                <div>
+                    <h6 class="text-muted mb-2">章节列表 (${sections.length})</h6>
+                    <div class="accordion" id="sections-accordion">
+                        ${sections.map((section, index) => `
+                            <div class="accordion-item">
+                                <h2 class="accordion-header">
+                                    <button class="accordion-button ${index > 0 ? 'collapsed' : ''}" type="button" data-bs-toggle="collapse" data-bs-target="#section-${section.section_id}">
+                                        <span class="badge bg-primary me-2">${section.section_index}</span>
+                                        <strong>${section.section_title}</strong>
+                                        <span class="badge bg-secondary ms-2">${section.section_type}</span>
+                                        <span class="badge bg-info ms-auto">${section.char_count} 字符</span>
+                                    </button>
+                                </h2>
+                                <div id="section-${section.section_id}" class="accordion-collapse collapse ${index === 0 ? 'show' : ''}" data-bs-parent="#sections-accordion">
+                                    <div class="accordion-body">
+                                        <pre class="bg-light p-3 rounded" style="max-height: 400px; overflow-y: auto;">${section.content}</pre>
+                                    </div>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+
+        } catch (error) {
+            console.error('加载文档详情失败:', error);
+            showAlert('加载文档详情失败', 'danger');
+        }
+    }
+
+    // 显示清理模态框
+    async function showCleanupModal() {
+        const modal = new bootstrap.Modal(document.getElementById('cleanupModal'));
+        modal.show();
+
+        try {
+            const response = await fetch('/data/cleanup/duplicates/preview');
+            const data = await response.json();
+
+            const modalBody = document.getElementById('cleanup-modal-body');
+            const executeBtn = document.getElementById('execute-cleanup-btn');
+
+            if (data.duplicates_found === 0) {
+                modalBody.innerHTML = `
+                    <div class="text-center py-5">
+                        <i class="fas fa-check-circle fa-3x text-success mb-3"></i>
+                        <h5>没有发现重复数据</h5>
+                        <p class="text-muted">系统数据很干净，无需清理</p>
+                    </div>
+                `;
+                executeBtn.style.display = 'none';
+                return;
+            }
+
+            modalBody.innerHTML = `
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    发现 ${data.duplicates_found} 个文件存在重复记录
+                </div>
+                <p>将要删除 ${data.total_records_to_delete} 条记录，保留每个文件的最新版本。</p>
+                <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                    <table class="table table-sm table-striped">
+                        <thead>
+                            <tr>
+                                <th>文件路径</th>
+                                <th>重复数</th>
+                                <th>保留</th>
+                                <th>删除</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${data.files.slice(0, 10).map(file => `
+                                <tr>
+                                    <td class="small text-truncate" style="max-width: 300px;" title="${file.file_path}">
+                                        ${file.file_path}
+                                    </td>
+                                    <td><span class="badge bg-warning">${file.count}</span></td>
+                                    <td><code class="small">${file.keep_doc_id.substring(0, 12)}...</code></td>
+                                    <td>
+                                        ${file.delete_doc_ids.length} 个
+                                        <small class="text-muted">(${file.delete_doc_ids.map(id => id.substring(0, 8)).join(', ')})</small>
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+                ${data.files.length > 10 ? `<p class="text-muted">显示前10条，共${data.files.length}条...</p>` : ''}
+            `;
+
+            executeBtn.style.display = 'block';
+            executeBtn.onclick = executeCleanup;
+
+        } catch (error) {
+            console.error('加载重复数据失败:', error);
+            showAlert('加载重复数据失败', 'danger');
+        }
+    }
+
+    // 执行清理
+    async function executeCleanup() {
+        if (!confirm('确定要执行清理操作吗？此操作不可恢复！')) {
+            return;
+        }
+
+        const executeBtn = document.getElementById('execute-cleanup-btn');
+        const originalText = executeBtn.innerHTML;
+        executeBtn.disabled = true;
+        executeBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>清理中...';
+
+        try {
+            const response = await fetch('/data/cleanup/duplicates?dry_run=false', { method: 'POST' });
+            const data = await response.json();
+
+            showAlert(`清理完成！删除了 ${data.total_records_to_delete} 条记录`, 'success');
+            bootstrap.Modal.getInstance(document.getElementById('cleanupModal')).hide();
+            loadStats();
+            loadDocuments(1);
+
+        } catch (error) {
+            console.error('清理失败:', error);
+            showAlert('清理失败: ' + error.message, 'danger');
+        } finally {
+            executeBtn.disabled = false;
+            executeBtn.innerHTML = originalText;
+        }
+    }
+
+    // 刷新数据
+    function refreshData() {
+        loadStats();
+        loadDocuments(1);
+        showAlert('数据已刷新', 'info');
+    }
+
+    // 页面加载完成后执行
+    document.addEventListener('DOMContentLoaded', () => {
+        loadStats();
+        loadDocuments();
+
+        // 搜索框回车事件
+        document.getElementById('search-input').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                searchDocuments();
+            }
+        });
+    });
+</script>
+{% endblock %}

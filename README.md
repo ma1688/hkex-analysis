@@ -1,17 +1,19 @@
 # 港股公告智能问答系统
 
-基于LangGraph的港股公告智能分析Agent系统，支持多种查询方式，提供API和CLI双接口。
+基于LangGraph的港股公告智能分析Agent系统，支持多种查询方式，提供**API**、**CLI**和**Web**三接口。
 
 ## ✨ 特性
 
 - 🤖 **基于LangGraph**: 使用LangGraph ReAct Agent架构
 - 🔧 **工具化设计**: 支持数据库查询、文档检索、内容合成等多种工具
 - 🎯 **配置驱动**: 所有配置从文件读取，零硬编码
-- 🚀 **双接口**: 提供FastAPI REST API和CLI命令行工具
+- 🚀 **三接口**: 提供FastAPI REST API、CLI命令行和Web界面
+- 🌐 **Web管理界面**: 支持PDF文件上传、任务监控、数据管理、统计分析
 - 🔌 **可扩展**: 支持自定义工具扩展，插件化架构
 - 🌐 **多LLM支持**: 支持硅基流动和OpenAI，自动主备切换
 - ⏰ **时间感知**: 内置时间工具集，支持实时时间和市场状态查询
 - 📊 **数据增强**: Layer 3智能数据增强，支持AkShare和Yahoo Finance双数据源，提供实时市场数据和质量评估
+- 📤 **批量处理**: 支持PDF批量上传、自动文档过滤、异步任务处理
 
 ## 📋 前置要求
 
@@ -86,7 +88,21 @@ uvicorn src.api.main:app --reload --port 8000
 
 访问 http://localhost:8000/docs 查看API文档
 
-#### 方式二：使用CLI
+#### 方式二：启动Web管理界面
+
+```bash
+uvicorn src.web.main:app --reload --port 8000
+```
+
+访问 http://localhost:8000 打开Web管理界面
+
+**Web界面功能**：
+- 📤 文件上传：支持单文件和批量上传，自动扫描目录
+- 📋 任务管理：实时查看任务进度和状态
+- 📊 数据管理：查看文档详情、章节内容
+- 📈 统计分析：文档数量、类型分布等统计信息
+
+#### 方式三：使用CLI
 
 ```bash
 # 单次问答（默认显示思考过程）✨
@@ -181,17 +197,38 @@ curl http://localhost:8000/api/v1/tools
 hkex-analysis/
 ├── config/              # 配置文件
 │   ├── agents.yaml      # Agent配置
-│   └── tools.yaml       # 工具配置
+│   ├── tools.yaml       # 工具配置
+│   └── prompts/         # 提示词配置
+│       └── prompts.yaml
 ├── src/
 │   ├── agent/           # Agent模块
-│   │   ├── document_agent.py  # 文档分析Agent
-│   │   ├── state.py           # 状态定义
-│   │   └── schemas.py         # 数据模型
+│   │   ├── supervisor.py     # LangGraph状态机协调器
+│   │   ├── document_agent.py # 文档分析Agent
+│   │   ├── planner.py        # 任务规划Agent
+│   │   ├── reflector.py      # 结果验证Agent
+│   │   ├── memory.py         # 记忆管理
+│   │   ├── context.py        # 上下文管理
+│   │   ├── data_enhancer.py  # 数据增强
+│   │   └── state.py          # 状态定义
 │   ├── api/             # API模块
-│   │   ├── main.py      # FastAPI应用
-│   │   └── schemas.py   # API数据模型
+│   │   └── main.py      # FastAPI应用
 │   ├── cli/             # CLI模块
-│   │   └── commands.py  # CLI命令
+│   │   └── v2/          # CLI v2架构
+│   │       ├── app.py       # 主入口
+│   │       ├── commands/    # 命令模块
+│   │       ├── services/    # 服务层
+│   │       └── presenters/  # 展示层
+│   ├── web/             # Web管理界面
+│   │   ├── main.py      # Web应用入口
+│   │   ├── routes/      # 路由模块
+│   │   │   ├── upload.py   # 文件上传
+│   │   │   ├── tasks.py    # 任务管理
+│   │   │   ├── data.py     # 数据管理
+│   │   │   └── stats.py    # 统计信息
+│   │   ├── services/    # 服务层
+│   │   ├── models/      # 数据模型
+│   │   ├── templates/   # HTML模板
+│   │   └── static/      # 静态资源
 │   ├── config/          # 配置管理
 │   │   └── settings.py  # Settings类
 │   ├── llm/             # LLM管理
@@ -200,11 +237,16 @@ hkex-analysis/
 │   │   ├── structured_data.py    # 数据库工具
 │   │   ├── document_retrieval.py # 文档检索工具
 │   │   ├── synthesis.py          # 合成分析工具
+│   │   ├── time_utils.py         # 时间感知工具
+│   │   ├── data_enhancement.py   # 数据增强工具
 │   │   ├── loader.py             # 工具加载器
 │   │   └── custom/               # 自定义工具目录
 │   └── utils/           # 工具模块
 │       ├── clickhouse.py  # ClickHouse客户端
-│       └── prompts.py     # 提示词模板
+│       └── text_cleaner.py # 文本清洗
+├── scripts/             # 脚本工具
+│   ├── chunk_pdf_by_sections.py  # PDF切块脚本
+│   └── document_filter_configurable.py # 文档过滤器
 ├── .env.example         # 环境变量模板
 ├── pyproject.toml       # 项目配置
 └── README.md            # 本文档
@@ -382,7 +424,18 @@ Development Team
 
 ---
 
-**版本**: 0.1.0 (Phase 1-3 完成)
+**版本**: 0.2.0 (Phase 1-3 完成，新增Web管理界面)
 
-**最后更新**: 2025-10-25
+**最后更新**: 2025-10-30
+
+## 🔧 最近修复
+
+### v0.2.0 更新
+
+- ✅ **Web管理界面**: 新增Web管理界面，支持文件上传、任务监控、数据管理
+- ✅ **脚本路径修复**: 修复Web上传中chunk_pdf.py路径错误问题
+- ✅ **PyMuPDF依赖**: 修复错误的fitz包依赖，更新为正确的PyMuPDF
+- ✅ **ClickHouse查询**: 统一修复ClickHouse查询参数格式问题
+- ✅ **错误处理**: 增强任务处理的错误日志和调试信息
+- ✅ **自动过滤**: 完善文档自动过滤机制，支持可配置规则
 
