@@ -64,7 +64,9 @@ curl http://localhost:8000/api/v1/health
 - **Reflector**: 结果验证Agent（`src/agent/reflector.py`）
 - **Memory Manager**: 记忆管理（`src/agent/memory.py`）
 - **Context Manager**: 上下文管理（`src/agent/context.py`）
+- **Context Injector**: 上下文注入器（`src/agent/context_injector.py`）
 - **Data Enhancer**: 数据增强（`src/agent/data_enhancer.py`）
+- **Web管理界面**: FastAPI构建的现代化界面，支持文件上传、任务管理、数据管理、统计分析（`src/web/`）
 - **工具系统**: 20+个工具，支持数据库查询、文档检索、内容合成、时间感知、数据增强
 - **LLM管理器**: 支持硅基流动和OpenAI，自动主备切换（`src/llm/manager.py`）
 
@@ -125,6 +127,17 @@ src/
 │   │       ├── stream_presenter.py # 流式展示
 │   │       └── table_presenter.py  # 表格展示
 │   └── commands.py        # CLI v1 - 旧实现（已备份）
+├── web/                  # Web管理界面（FastAPI）
+│   ├── main.py             # Web应用入口
+│   ├── routes/             # 路由模块
+│   │   ├── upload.py         # 文件上传
+│   │   ├── tasks.py          # 任务管理
+│   │   ├── data.py           # 数据管理
+│   │   └── stats.py          # 统计信息
+│   ├── services/           # 服务层
+│   ├── models/             # 数据模型
+│   ├── templates/          # HTML模板
+│   └── static/             # 静态资源
 ├── tools/               # 工具集
 │   ├── structured_data.py    # 数据库查询工具
 │   ├── document_retrieval.py # 文档检索工具
@@ -145,16 +158,19 @@ src/
 
 | 功能模块 | 关键文件 | 说明 |
 |---------|---------|------|
-| **入口文件** | `src/cli/v2/app.py` | CLI v2主入口 |
+| **入口文件** | `src/cli/v2/app.py` | CLI v2主入口（hkex-agent命令） |
 | | `src/api/main.py` | API服务入口 |
+| | `src/web/main.py` | Web管理界面入口 |
 | **Agent核心** | `src/agent/supervisor.py` | LangGraph状态机 |
 | | `src/agent/document_agent.py` | 文档分析Agent |
 | | `src/agent/state.py` | 状态定义 |
+| | `src/agent/context_injector.py` | 上下文注入器 |
 | **配置** | `src/config/settings.py` | 配置管理 |
 | | `config/agents.yaml` | Agent配置 |
 | | `config/prompts/prompts.yaml` | 提示词配置 |
 | **工具** | `src/tools/loader.py` | 工具加载器 |
 | | `src/tools/structured_data.py` | 数据查询工具 |
+| | `src/tools/data_enhancement.py` | 数据增强工具（Layer 3） |
 
 ### 配置文件
 
@@ -173,9 +189,38 @@ src/
 
 ### 核心工具列表
 
-- 数据查询: `query_ipo_data`, `query_placing_data`, `query_rights_data`, `query_consolidation_data`
-- 文档检索: `search_documents`, `retrieve_chunks`
-- 内容分析: `synthesize_chunks`, `extract_key_info`, `compare_data`
+| 工具类型 | 工具名 | 功能说明 | 主要参数 |
+|---------|--------|----------|----------|
+| **数据查询工具** |
+| | `query_ipo_data` | 查询IPO数据 | stock_code, start_date, end_date, limit |
+| | `query_placing_data` | 查询配售数据 | stock_code, start_date, end_date, limit |
+| | `query_rights_data` | 查询供股数据 | stock_code, start_date, end_date, limit |
+| | `query_consolidation_data` | 查询合股数据 | stock_code, start_date, end_date, limit |
+| **文档检索工具** |
+| | `search_documents` | 搜索公告文档 | stock_code, document_type, start_date, limit |
+| | `retrieve_chunks` | 检索文档切块 | doc_id, stock_code, keyword, limit |
+| **内容分析工具** |
+| | `synthesize_chunks` | 合成多个切块 | chunks_json |
+| | `extract_key_info` | 提取关键信息 | text, info_type |
+| | `compare_data` | 对比两组数据 | data1_json, data2_json, dimensions |
+| **时间感知工具** |
+| | `get_current_time` | 获取当前时间 | 无 |
+| | `get_market_time` | 获取市场状态 | 无 |
+| | `calculate_time_diff` | 计算时间差 | date_str, format_type |
+| | `format_time_period` | 格式化时间段 | start_date, end_date |
+| | `get_date_info` | 获取日期信息 | date_str |
+| **Layer 3数据增强工具** |
+| | `assess_data_quality` | 评估数据质量 | data_json |
+| | `enhance_market_data` | 增强市场数据 | query, stock_data |
+| | `get_real_time_stock_info` | 获取实时股票信息 | symbol |
+| **辅助工具** |
+| | `get_document_metadata` | 获取文档元信息 | doc_id |
+
+**Layer 3 数据增强特性**：
+- ✅ 实时市场数据获取（AkShare + Yahoo Finance双数据源）
+- ✅ 数据质量评估（完整性、准确性、时效性、一致性四维度）
+- ✅ 智能数据增强（自动降级策略，优雅失败处理）
+- ✅ 市场状态感知和时间上下文自动注入
 
 ## 开发注意事项
 
@@ -197,7 +242,21 @@ src/
 
 - CLI默认显示Agent思考过程，便于调试
 - 使用`--no-thoughts`参数可隐藏思考过程
+- CLI详细模式：`hkex-agent ask "问题" -d` 显示完整执行流程
 - API提供健康检查端点：`GET /api/v1/health`
+- Web界面提供可视化任务管理和数据查看
+- 工具列表查看：`hkex-agent tools-list`
+- 配置查看：`hkex-agent config`
+
+**思考过程展示示例**：
+```bash
+$ hkex-agent ask "查询00700配售数据"
+
+💭 思考: 需要查询00700的配售数据...
+🔧 调用工具: query_placing_data
+✅ 工具返回: [{"stock_code": "00700", ...}]
+💭 思考: 根据查询结果，配售信息为...
+```
 
 ### 常见修改场景
 
@@ -222,6 +281,23 @@ src/
    # 修改 .env 文件
    SILICONFLOW_FAST_MODEL=deepseek-ai/DeepSeek-V3
    SILICONFLOW_STRONG_MODEL=Qwen/Qwen2.5-72B-Instruct
+   OPENAI_API_KEY=your_openai_key  # 可选：OpenAI作为备选
+   ```
+
+4. **启用Web管理界面**:
+   ```bash
+   # 启动Web服务
+   ./run_web.sh
+   # 或指定端口
+   ./run_web.sh 9000
+
+   # 访问 http://localhost:8080
+   ```
+
+5. **自定义文档过滤规则**:
+   ```python
+   # 编辑 scripts/document_filter_configurable.py
+   # 修改 FILTER_PATTERNS 来自定义过滤规则
    ```
 
 4. **自定义提示词**:
@@ -247,10 +323,20 @@ src/
    curl http://localhost:8000/api/v1/health  # 健康检查
    ```
 
-3. **常见问题**:
+3. **Web界面调试**:
+   ```bash
+   # 检查Web服务状态
+   curl http://localhost:8000/
+   # 查看Web API文档
+   http://localhost:8000/api/docs
+   ```
+
+4. **常见问题**:
    - **Document Agent未启用**: 检查`config/agents.yaml`中`document.enabled=true`
    - **API密钥错误**: 确认`.env`中`SILICONFLOW_API_KEY`正确
    - **工具未加载**: 检查`src/tools/custom/`中的工具文件格式
+   - **Web界面无法访问**: 确认端口未被占用，检查`run_web.sh`输出日志
+   - **上传失败**: 检查`src/web/static/uploads`目录权限和大小限制
 
 4. **日志查看**:
    ```bash
@@ -268,3 +354,37 @@ src/
 5. `config/prompts/prompts.yaml` 提示词配置
 
 **注意**: 提示词完全配置化，所有系统提示词从`config/prompts/prompts.yaml`加载，代码中无硬编码提示词。
+
+## 🎯 项目特性总结
+
+### 三层架构（Phase 1-3已实现）
+
+**Phase 1 - 基础版本**（✅已完成）：
+- Document Agent（ReAct模式）
+- 数据库工具集（IPO、配售、供股、合股）
+- 文档检索工具
+- API和CLI接口
+
+**Phase 2 - 上下文注入**（✅已完成）：
+- 智能查询分析
+- 时间上下文自动注入
+- 市场状态感知
+- 业务数据时效性标注
+
+**Phase 3 - 数据增强**（✅已完成）：
+- 实时市场数据获取（AkShare + Yahoo Finance双数据源）
+- 数据质量评估（完整性、准确性、时效性、一致性四维度）
+- 智能数据增强（自动降级策略，优雅失败处理）
+
+### 三种接口
+
+1. **CLI命令行**：支持交互式对话和单次问答，默认展示思考过程
+2. **FastAPI REST API**：提供同步和流式查询，支持会话管理
+3. **Web管理界面**：现代化UI，支持文件上传、任务管理、数据查看、统计分析
+
+### 配置驱动
+
+- **零硬编码**：所有配置从YAML文件和环境变量读取
+- **提示词配置化**：所有系统提示词在`config/prompts/prompts.yaml`中管理
+- **Agent可配置**：在`config/agents.yaml`中调整模型、温度、工具列表
+- **工具可扩展**：支持自定义工具，自动加载`src/tools/custom/`目录
