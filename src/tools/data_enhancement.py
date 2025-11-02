@@ -18,8 +18,7 @@ def enhance_market_data(query: str, stock_data: str = "") -> str:
     - 评估配售折让率、供股价是否合理
     
     【不适用场景】
-    - 只需要历史公告数据 → 使用结构化查询工具
-    - 基本信息查询 → query_*_data工具已足够
+    - 只需要历史公告数据 → 使用 search_documents + retrieve_chunks
     
     【注意】此工具会调用外部API，可能较慢，仅在必要时使用
 

@@ -1,0 +1,69 @@
+version: '3.8'
+
+services:
+  clickhouse:
+    image: clickhouse/clickhouse-server:25.8-alpine
+    container_name: clickhouse_hkex
+    restart: unless-stopped
+    
+    # 使用非默认端口
+    ports:
+      - "18168:8123"  # HTTP接口（默认8123 -> 自定义18123）
+      - "19168:9000"  # TCP接口（默认9000 -> 自定义19000）
+    
+    environment:
+      # 数据库配置
+      CLICKHOUSE_DB: hkex_analysis
+      CLICKHOUSE_USER: hkex_user
+      CLICKHOUSE_PASSWORD: hkex_password_2025
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+      
+      # 性能配置
+      CLICKHOUSE_MAX_MEMORY_USAGE: 2147483648  # 2GB
+      CLICKHOUSE_MAX_MEMORY_USAGE_FOR_USER: 1073741824  # 1GB
+    
+    volumes:
+      # 数据持久化
+      - clickhouse_data:/var/lib/clickhouse
+      - clickhouse_logs:/var/log/clickhouse-server
+      
+      # 配置文件
+      - ./docker/clickhouse/config.xml:/etc/clickhouse-server/config.d/custom.xml:ro
+      - ./docker/clickhouse/users.xml:/etc/clickhouse-server/users.d/custom_users.xml:ro
+      
+      # 初始化脚本
+      - ./docker/clickhouse/init:/docker-entrypoint-initdb.d:ro
+    
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8123/ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    
+    networks:
+      - hkex-network
+    
+    # 资源限制（可选）
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+volumes:
+  clickhouse_data:
+    driver: local
+    name: hkex_clickhouse_data
+  clickhouse_logs:
+    driver: local
+    name: hkex_clickhouse_logs
+
+networks:
+  hkex-network:
+    driver: bridge
+    name: hkex-network
+

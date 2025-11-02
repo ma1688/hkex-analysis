@@ -23,10 +23,6 @@ sub_agents:
     tools:
       - search_documents
       - retrieve_chunks
-      - query_ipo_data
-      - query_placing_data
-      - query_rights_data
-      - query_consolidation_data
       - synthesize_chunks
       - extract_key_info
       # 时间感知工具

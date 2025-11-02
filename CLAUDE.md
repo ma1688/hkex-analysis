@@ -169,7 +169,6 @@ src/
 | | `config/agents.yaml` | Agent配置 |
 | | `config/prompts/prompts.yaml` | 提示词配置 |
 | **工具** | `src/tools/loader.py` | 工具加载器 |
-| | `src/tools/structured_data.py` | 数据查询工具 |
 | | `src/tools/data_enhancement.py` | 数据增强工具（Layer 3） |
 
 ### 配置文件
@@ -191,11 +190,6 @@ src/
 
 | 工具类型 | 工具名 | 功能说明 | 主要参数 |
 |---------|--------|----------|----------|
-| **数据查询工具** |
-| | `query_ipo_data` | 查询IPO数据 | stock_code, start_date, end_date, limit |
-| | `query_placing_data` | 查询配售数据 | stock_code, start_date, end_date, limit |
-| | `query_rights_data` | 查询供股数据 | stock_code, start_date, end_date, limit |
-| | `query_consolidation_data` | 查询合股数据 | stock_code, start_date, end_date, limit |
 | **文档检索工具** |
 | | `search_documents` | 搜索公告文档 | stock_code, document_type, start_date, limit |
 | | `retrieve_chunks` | 检索文档切块 | doc_id, stock_code, keyword, limit |

@@ -29,7 +29,6 @@ def search_documents(
     - 按文档类型（配售/供股/招股书等）筛选
     
     【不适用场景】
-    - 明确需要配售/IPO/供股结构化数据 → 优先用 query_*_data 工具（更快）
     - 已知doc_id需要内容 → 直接用 retrieve_chunks
     - 需要完整文档内容 → 需要配合 retrieve_chunks 使用
     
@@ -158,7 +157,6 @@ def retrieve_chunks(
     - 作为synthesize_chunks的输入数据
     
     【不适用场景】
-    - 只需要结构化摘要数据 → 优先用 query_*_data 工具（更快更准确）
     - 没有doc_id也没有关键词 → 先用 search_documents 获取doc_id
     
     【前置条件】

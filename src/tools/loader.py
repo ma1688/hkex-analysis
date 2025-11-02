@@ -64,7 +64,6 @@ class ToolLoader:
 
         # 导入内置工具模块
         builtin_modules = [
-            "src.tools.structured_data",
             "src.tools.document_retrieval",
             "src.tools.synthesis",
             "src.tools.time_utils",

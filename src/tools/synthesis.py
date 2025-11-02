@@ -97,7 +97,6 @@ def extract_key_info(text: str, info_type: str = "summary") -> str:
     
     【不适用场景】
     - 需要完整原文 → 使用 retrieve_chunks
-    - 需要结构化数据 → 优先用 query_*_data 工具
     
     【前置条件】
     - 提供文本内容（可以是synthesize_chunks的输出或原始文本）
