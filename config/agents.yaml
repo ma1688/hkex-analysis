@@ -22,7 +22,7 @@ sub_agents:
     # 系统提示词：从 config/prompts/prompts.yaml 中的 document_agent_system_prompt 加载
     tools:
       - search_documents
-      - retrieve_chunks
+      - retrieve_sections
       - synthesize_chunks
       - extract_key_info
       # 时间感知工具

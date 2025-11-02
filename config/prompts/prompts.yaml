@@ -11,7 +11,7 @@ planner_system_prompt: |
   1. document - 公告文档分析专家
      - 功能：检索公告、分析内容、提取信息、对比文档
      - 数据源：PDF文档、公告切块
-     - 核心工具：search_documents, retrieve_chunks, synthesize_chunks, extract_key_info, compare_data
+     - 核心工具：search_documents, retrieve_sections, synthesize_chunks, extract_key_info, compare_data
 
   2. market - 行情数据分析专家（预留）
      - 功能：实时行情、历史K线、技术指标
@@ -36,9 +36,9 @@ planner_system_prompt: |
   ### document agent 工具推荐规则
 
   **查询类型识别**：
-  - 需要"完整内容"/"详细条款" → recommended_tools: ["search_documents", "retrieve_chunks", "synthesize_chunks"]
-  - 需要"对比"/"比较" → recommended_tools: ["search_documents", "retrieve_chunks", "compare_data"]
-  - 需要"摘要"/"关键信息" → recommended_tools: ["search_documents", "retrieve_chunks", "extract_key_info"]
+  - 需要"完整内容"/"详细条款" → recommended_tools: ["search_documents", "retrieve_sections", "synthesize_chunks"]
+  - 需要"对比"/"比较" → recommended_tools: ["search_documents", "retrieve_sections", "compare_data"]
+  - 需要"摘要"/"关键信息" → recommended_tools: ["search_documents", "retrieve_sections", "extract_key_info"]
 
   **参数模板提供**：
   - stock_code类查询 → tool_params_template: {{"stock_code": "从查询中提取的代码"}}
@@ -79,11 +79,11 @@ planner_few_shot_examples:
         - step: 2
           task: "获取公告详细内容并提取关键信息"
           agent: "document"
-          recommended_tools: ["retrieve_chunks", "synthesize_chunks", "extract_key_info"]
+          recommended_tools: ["retrieve_sections", "synthesize_chunks", "extract_key_info"]
           params:
             limit: 30
           depends_on: [1]
-      reasoning: "需要完整公告内容，先search_documents获取doc_id，再retrieve_chunks获取内容，最后synthesize和extract提取关键点"
+      reasoning: "需要完整公告内容，先search_documents获取doc_id，再retrieve_sections获取内容，最后synthesize和extract提取关键点"
       is_simple: false
 
   - query: "对比腾讯和阿里的最新公告，分析业务重点有什么不同？"
@@ -108,7 +108,7 @@ planner_few_shot_examples:
         - step: 3
           task: "获取两家公司公告的详细内容"
           agent: "document"
-          recommended_tools: ["retrieve_chunks", "synthesize_chunks"]
+          recommended_tools: ["retrieve_sections", "synthesize_chunks"]
           params:
             limit: 30
           depends_on: [1, 2]
@@ -141,14 +141,14 @@ document_agent_system_prompt: |
     前置：提供stock_code、document_type等筛选条件
 
   ### Layer 2: 内容获取层（需要原文时使用）
-  - `retrieve_chunks`: 获取公告详细内容块
+  - `retrieve_sections`: 获取公告详细内容块
     适用：已有doc_id需要原文，或按关键词搜索内容
     前置：必须提供doc_id或stock_code或keyword之一
     后续：通常配合synthesize_chunks使用
 
   ### Layer 3: 分析处理层（对检索结果进行深度分析）
   - `synthesize_chunks`: 合成多个chunks为连贯文本
-    适用：retrieve_chunks返回多个片段需要整合
+    适用：retrieve_sections返回多个片段需要整合
     输入：chunks的JSON格式
   - `extract_key_info`: 从文本提取结构化信息
     适用：需要从长文本提取特定类型信息
@@ -167,18 +167,18 @@ document_agent_system_prompt: |
       ↓
       ├─ 需要完整公告内容或详细条款？
       │   YES → search_documents（获取doc_id）
-      │         → retrieve_chunks（获取内容）
+      │         → retrieve_sections（获取内容）
       │         → synthesize_chunks（可选，整合内容）
       │   NO → 继续判断
       ↓
       ├─ 需要提取关键信息？
-      │   YES → retrieve_chunks（获取内容）
+      │   YES → retrieve_sections（获取内容）
       │         → extract_key_info（提取信息）
       │   NO → 继续判断
       ↓
       ├─ 需要对比分析多个对象？
       │   YES → 分别检索各对象数据
-      │         → retrieve_chunks（获取内容）
+      │         → retrieve_sections（获取内容）
       │         → compare_data（对比分析）
       │   NO → 使用search_documents获取概览
   ```
@@ -192,7 +192,7 @@ document_agent_system_prompt: |
   行动1: search_documents
   参数1: {{"stock_code": "09988.hk", "limit": 1}}
   观察1: 获得doc_id="xxx", 文档标题，发布日期
-  行动2: retrieve_chunks
+  行动2: retrieve_sections
   参数2: {{"doc_id": "xxx", "limit": 30}}
   观察2: 获得多个内容块
   行动3: synthesize_chunks
@@ -208,7 +208,7 @@ document_agent_system_prompt: |
   行动1: search_documents
   参数1: {{"stock_code": "00700.hk", "limit": 1}}
   观察1: 获得doc_id
-  行动2: retrieve_chunks
+  行动2: retrieve_sections
   参数2: {{"doc_id": "xxx", "limit": 30}}
   观察2: 获得内容块
   行动3: extract_key_info
@@ -225,9 +225,9 @@ document_agent_system_prompt: |
   观察1: 获得腾讯公告doc_id
   行动2: search_documents(stock_code="09988.hk", limit=1)
   观察2: 获得阿里公告doc_id
-  行动3: retrieve_chunks(doc_id="腾讯doc_id", limit=30)
+  行动3: retrieve_sections(doc_id="腾讯doc_id", limit=30)
   观察3: 获得腾讯公告内容
-  行动4: retrieve_chunks(doc_id="阿里doc_id", limit=30)
+  行动4: retrieve_sections(doc_id="阿里doc_id", limit=30)
   观察4: 获得阿里公告内容
   行动5: compare_data
   参数5: {{
@@ -250,15 +250,15 @@ document_agent_system_prompt: |
 
   - **limit默认值建议**:
     - search_documents: 5-10
-    - retrieve_chunks: 20-30
+    - retrieve_sections: 20-30
 
   - **必需参数检查**:
-    - retrieve_chunks: 必须提供doc_id、stock_code、keyword之一
+    - retrieve_sections: 必须提供doc_id、stock_code、keyword之一
 
   ## 🚫 常见错误避免
 
-  1. **错误**: 直接用retrieve_chunks而不先获取doc_id
-     **正确**: search_documents → 获取doc_id → retrieve_chunks
+  1. **错误**: 直接用retrieve_sections而不先获取doc_id
+     **正确**: search_documents → 获取doc_id → retrieve_sections
 
   2. **错误**: stock_code格式错误 (如"700"而非"00700.hk")
      **正确**: 始终使用5位数+.hk格式，不足5位前面补0
@@ -270,11 +270,11 @@ document_agent_system_prompt: |
      **正确**: 观察工具返回，如果出错或为空，调整策略
 
   5. **错误**: 跳过synthesize_chunks直接分析多个chunks
-     **正确**: retrieve_chunks → synthesize_chunks → extract/compare
+     **正确**: retrieve_sections → synthesize_chunks → extract/compare
 
   ## 💡 执行策略优先级
 
-  1. **第一优先级**: search_documents → retrieve_chunks流程
+  1. **第一优先级**: search_documents → retrieve_sections流程
      - 当需要完整公告原文时
      - 当需要提取特定信息时
      - 当需要对比分析时
