@@ -1,6 +1,7 @@
 """Ask命令 - 使用Click实现的单次问答命令"""
 import asyncio
 import uuid
+import signal
 from typing import Optional
 
 import click
@@ -57,7 +58,7 @@ async def async_ask(
 ):
     """
     异步执行问答逻辑
-    
+
     Args:
         question: 用户问题
         session: 会话ID
@@ -65,63 +66,88 @@ async def async_ask(
         detailed: 是否显示详细内容
     """
     console = Console()
-    
+    agent_service = get_agent_service()
+
+    # 记录原始信号处理器
+    original_handler = None
+    if hasattr(signal, 'SIGINT'):
+        try:
+            original_handler = signal.signal(signal.SIGINT, signal.SIG_DFL)
+        except (ValueError, OSError):
+            pass
+
     try:
         # 初始化服务
-        agent_service = get_agent_service()
         context_service = get_context_service()
         presenter = StreamPresenter(console, detailed)
-        
+
         # 会话ID
         session_id = session or str(uuid.uuid4())
-        
+
         # 上下文注入
         enhanced_query, context_info = await context_service.enhance_query(
             question,
             user_id="cli_user"
         )
-        
+
         # 显示上下文信息
         if context_service.should_display_context(context_info):
             presenter.display_context_info(context_info)
-        
+
         # 显示问题和模型信息
         console.print(f"\n[bold cyan]问题:[/bold cyan] {question}")
         console.print(
             f"[dim]📍 模型: [cyan]{agent_service.model_name}[/cyan] "
             f"(温度: {agent_service.temperature})[/dim]\n"
         )
-        
+        console.print("[dim]💡 提示: 执行过程中按 Ctrl+C 可中断Agent[/dim]\n")
+
         if thoughts:
             # 流式展示思考过程
             event_stream = agent_service.ask_stream(enhanced_query, session_id)
             answer = await presenter.display_stream(event_stream)
-            
-            # 显示最终答案
-            presenter.display_answer(answer)
+
+            # 显示最终答案（如果不是中断的）
+            if not presenter.is_interrupted():
+                presenter.display_answer(answer)
         else:
             # 普通模式（不显示思考过程）
             with console.status("[bold green]思考中..."):
                 result = agent_service.ask_sync(enhanced_query, session_id)
                 answer = agent_service.extract_answer(result)
-                
+
                 if not answer:
                     answer = "无法生成答案"
-            
+
             # 显示答案
             console.print("[bold green]回答:[/bold green]")
             console.print(answer)
-        
+
         console.print(f"\n[dim]会话ID: {session_id}[/dim]")
-        
+
     except KeyboardInterrupt:
-        console.print("\n[bold yellow]操作已取消[/bold yellow]")
+        # 处理Ctrl+C
+        console.print("\n[bold red]⚠️  中断信号已发送[/bold red]")
+        console.print("[dim]💡 等待Agent停止（最多50ms）...[/dim]")
+        # 中断Agent
+        agent_service.interrupt()
+        # 短暂等待Agent停止
+        import time
+        time.sleep(0.1)
+        console.print("[bold yellow]✅ 操作已取消[/bold yellow]")
         raise click.Abort()
     except Exception as e:
         console.print(f"[bold red]错误:[/bold red] {e}")
         import traceback
         console.print(f"[dim]{traceback.format_exc()}[/dim]")
         raise click.Abort()
+    finally:
+        # 恢复原始信号处理器
+        if hasattr(signal, 'SIGINT') and original_handler is not None:
+            try:
+                signal.signal(signal.SIGINT, original_handler)
+            except:
+                pass
 
 
 if __name__ == "__main__":
