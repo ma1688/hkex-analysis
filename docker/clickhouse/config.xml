@@ -1,0 +1,61 @@
+<?xml version="1.0"?>
+<clickhouse>
+    <!-- 日志配置 -->
+    <logger>
+        <level>information</level>
+        <log>/var/log/clickhouse-server/clickhouse-server.log</log>
+        <errorlog>/var/log/clickhouse-server/clickhouse-server.err.log</errorlog>
+        <size>100M</size>
+        <count>3</count>
+    </logger>
+
+    <!-- 监听配置 -->
+    <listen_host>::</listen_host>
+    <http_port>8123</http_port>
+    <tcp_port>9000</tcp_port>
+    <interserver_http_port>9009</interserver_http_port>
+
+    <!-- 性能配置 -->
+    <max_connections>4096</max_connections>
+    <keep_alive_timeout>3</keep_alive_timeout>
+    <max_concurrent_queries>100</max_concurrent_queries>
+    
+    <!-- 内存配置 -->
+    <max_server_memory_usage>2147483648</max_server_memory_usage>  <!-- 2GB -->
+    <max_server_memory_usage_to_ram_ratio>0.9</max_server_memory_usage_to_ram_ratio>
+    
+    <!-- 查询配置（已移至users.xml） -->
+    
+    <!-- 临时数据配置 -->
+    <tmp_policy>default</tmp_policy>
+    <tmp_path>/var/lib/clickhouse/tmp/</tmp_path>
+    
+    <!-- 字典配置 -->
+    <dictionaries_config>*_dictionary.xml</dictionaries_config>
+    
+    <!-- 用户配置 -->
+    <user_files_path>/var/lib/clickhouse/user_files/</user_files_path>
+    
+    <!-- 时区配置 -->
+    <timezone>Asia/Hong_Kong</timezone>
+    
+    <!-- 格式配置 -->
+    <format_schema_path>/var/lib/clickhouse/format_schemas/</format_schema_path>
+    
+    <!-- 查询日志 -->
+    <query_log>
+        <database>system</database>
+        <table>query_log</table>
+        <partition_by>toYYYYMM(event_date)</partition_by>
+        <flush_interval_milliseconds>7500</flush_interval_milliseconds>
+    </query_log>
+    
+    <!-- 查询线程日志 -->
+    <query_thread_log>
+        <database>system</database>
+        <table>query_thread_log</table>
+        <partition_by>toYYYYMM(event_date)</partition_by>
+        <flush_interval_milliseconds>7500</flush_interval_milliseconds>
+    </query_thread_log>
+</clickhouse>
+

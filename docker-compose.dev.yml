@@ -1,0 +1,88 @@
+version: '3.8'
+
+# 开发环境Docker Compose配置
+# 使用方式: docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
+
+services:
+  # 开发环境 - 热重载版本
+  web-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: hkex-web-dev
+    environment:
+      # 开发环境配置
+      APP_ENV: development
+      APP_HOST: 0.0.0.0
+      APP_PORT: 8080
+      APP_LOG_LEVEL: DEBUG
+
+      # 数据库配置
+      CLICKHOUSE_HOST: clickhouse
+      CLICKHOUSE_PORT: 8123
+      CLICKHOUSE_DATABASE: hkex_analysis
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: ""
+      CLICKHOUSE_POOL_SIZE: 5
+
+      # LLM配置
+      SILICONFLOW_API_KEY: ${SILICONFLOW_API_KEY}
+      SILICONFLOW_BASE_URL: ${SILICONFLOW_BASE_URL:-https://api.siliconflow.cn/v1}
+      SILICONFLOW_FAST_MODEL: ${SILICONFLOW_FAST_MODEL:-deepseek-ai/DeepSeek-V3}
+      SILICONFLOW_STRONG_MODEL: ${SILICONFLOW_STRONG_MODEL:-Qwen/Q2.5-72B-Instruct}
+
+      # OpenAI备选配置
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
+
+    # 开发模式下挂载源码以支持热重载
+    volumes:
+      - .:/app
+      - app_uploads:/app/src/web/static/uploads
+    ports:
+      - "8080:8080"
+    networks:
+      - hkex-network
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+    restart: unless-stopped
+    # 开发模式下使用reload模式
+    command: ["uvicorn", "src.web.main:app", "--host", "0.0.0.0", "--port", "8080", "--reload"]
+
+  api-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: hkex-api-dev
+    command: ["uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    environment:
+      APP_ENV: development
+      APP_HOST: 0.0.0.0
+      APP_PORT: 8000
+      APP_LOG_LEVEL: DEBUG
+
+      CLICKHOUSE_HOST: clickhouse
+      CLICKHOUSE_PORT: 8123
+      CLICKHOUSE_DATABASE: hkex_analysis
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: ""
+
+      SILICONFLOW_API_KEY: ${SILICONFLOW_API_KEY}
+      SILICONFLOW_BASE_URL: ${SILICONFLOW_BASE_URL:-https://api.siliconflow.cn/v1}
+      SILICONFLOW_FAST_MODEL: ${SILICONFLOW_FAST_MODEL:-deepseek-ai/DeepSeek-V3}
+      SILICONFLOW_STRONG_MODEL: ${SILICONFLOW_STRONG_MODEL:-Qwen/Q2.5-72B-Instruct}
+
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
+
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+    networks:
+      - hkex-network
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+    restart: unless-stopped
