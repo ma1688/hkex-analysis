@@ -218,30 +218,54 @@ class PDFSectionChunker:
         print(f"\n✅ 共提取 {len(sections)} 个章节")
         return sections
 
+    def extract_category_fields(self) -> Dict:
+        """从文件路径提取分类字段（新增）"""
+        parts = self.pdf_path.parts
+        
+        try:
+            hkex_idx = parts.index('HKEX')
+            # 文档主分类：HKEX/股票代码/【这一层】
+            document_category = parts[hkex_idx + 2] if len(parts) > hkex_idx + 2 else ''
+            # 公告子分类：HKEX/股票代码/主分类/【这一层】
+            announcement_category = parts[hkex_idx + 3] if len(parts) > hkex_idx + 3 else ''
+        except (ValueError, IndexError):
+            document_category = ''
+            announcement_category = ''
+        
+        # 从文件名提取公告标题
+        filename = self.pdf_path.stem
+        match = re.match(r'\d{4}-\d{2}-\d{2}_\d+_[^_]+_(.*)', filename)
+        announcement_title = match.group(1).replace('n', ' ') if match else filename
+        
+        return {
+            'document_category': document_category,
+            'announcement_category': announcement_category,
+            'announcement_title': announcement_title
+        }
+
     def insert_document_metadata(self, metadata: Dict, total_sections: int):
-        """插入文档元信息"""
+        """插入文档元信息（V2.2 - 精简版）"""
         print("\n💾 插入文档元信息到 documents_v2...")
 
-        # 匹配最新表结构（无embedding字段）
+        # 提取分类字段
+        category_fields = self.extract_category_fields()
+
+        # 匹配最新表结构（V2.2 - 精简至11个字段）
         data = [[
             self.doc_id,  # doc_id
-            metadata['title'],  # title
+            category_fields['announcement_title'],  # announcement_title
             self.stock_code,  # stock_code
             metadata['company_name'],  # company_name
-            'rights',  # document_type
-            metadata['sub_type'],  # document_subtype
+            category_fields['document_category'],  # document_category
+            category_fields['announcement_category'],  # announcement_category
             metadata['publish_date'],  # announcement_date
-            datetime.now(),  # processing_date
             str(self.pdf_path),  # file_path
-            self.pdf_path.stat().st_size if self.pdf_path.exists() else 0,  # file_size
             len(self.doc),  # page_count
-            'completed',  # processing_status
-            '',  # error_message
-            total_sections,  # section_count
-            0,  # total_chars (暂时为0)
             json.dumps({  # metadata (JSON格式)
                 'rights_ratio': metadata['rights_ratio'],
-                'processing_version': '2.0',
+                'document_subtype': metadata['sub_type'],  # 移到metadata中
+                'section_count': total_sections,  # 移到metadata中
+                'processing_version': '2.2',
                 'source_system': 'hkex'
             }, ensure_ascii=False)
         ]]
@@ -250,13 +274,12 @@ class PDFSectionChunker:
             'documents_v2',
             data,
             column_names=[
-                'doc_id', 'title', 'stock_code', 'company_name', 'document_type',
-                'document_subtype', 'announcement_date', 'processing_date', 'file_path',
-                'file_size', 'page_count', 'processing_status', 'error_message',
-                'section_count', 'total_chars', 'metadata'
+                'doc_id', 'announcement_title', 'stock_code', 'company_name',
+                'document_category', 'announcement_category', 'announcement_date',
+                'file_path', 'page_count', 'metadata'
             ]
         )
-        print("✅ 文档元信息已插入")
+        print("✅ 文档元信息已插入（V2.2精简版）")
 
     def check_if_processed(self) -> bool:
         """检查文档是否已处理（断点续传）"""
@@ -271,9 +294,12 @@ class PDFSectionChunker:
             return False
 
     def insert_sections(self, sections: List[Dict]):
-        """批量插入章节数据（带进度提示）"""
+        """批量插入章节数据（V2.2 - 精简版）"""
         total = len(sections)
         print(f"\n💾 插入 {total} 个章节到 document_sections...")
+
+        # 提取分类字段
+        category_fields = self.extract_category_fields()
 
         # 批量插入（提高性能）
         batch_size = 50
@@ -285,21 +311,15 @@ class PDFSectionChunker:
                 data.append([
                     section['section_id'],  # section_id
                     self.doc_id,  # doc_id
-                    'rights',  # document_type
-                    section['section_type'],  # section_type
-                    '',  # section_subtype
+                    category_fields['document_category'],  # document_category
+                    category_fields['announcement_category'],  # announcement_category
+                    section['section_type'],  # section_type（保留）
                     section['section_title'],  # section_title
                     section['section_index'],  # section_index
                     section['page_start'],  # page_start
                     section['page_end'],  # page_end
                     section['content'],  # content
-                    '',  # content_hash
-                    len(section['content']),  # char_count
-                    0,  # word_count
                     section['section_level'],  # priority
-                    'normal',  # importance
-                    1.0,  # confidence
-                    'regex',  # identification_method
                     json.dumps({  # metadata (JSON格式)
                         'section_num': section['section_num'],
                         'has_table': False,
@@ -311,11 +331,9 @@ class PDFSectionChunker:
                 'document_sections',
                 data,
                 column_names=[
-                    'section_id', 'doc_id', 'document_type', 'section_type',
-                    'section_subtype', 'section_title', 'section_index',
-                    'page_start', 'page_end', 'content', 'content_hash',
-                    'char_count', 'word_count', 'priority', 'importance',
-                    'confidence', 'identification_method', 'metadata'
+                    'section_id', 'doc_id', 'document_category', 'announcement_category',
+                    'section_type', 'section_title', 'section_index', 'page_start',
+                    'page_end', 'content', 'priority', 'metadata'
                 ]
             )
 
@@ -324,7 +342,7 @@ class PDFSectionChunker:
             percentage = (progress / total) * 100
             print(f"   [{progress}/{total}] {percentage:.0f}%", end='\r')
 
-        print(f"\n✅ 章节数据已插入完成")
+        print(f"\n✅ 章节数据已插入完成（V2.2精简版）")
 
     def verify_integrity(self):
         """验证数据完整性"""
