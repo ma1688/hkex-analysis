@@ -325,7 +325,7 @@
         });
     }
 
-    // 显示最近文档
+    // 显示最近文档（V2.2）
     function displayRecentDocuments(documents) {
         const recentDiv = document.getElementById('recent-documents');
 
@@ -348,16 +348,18 @@
                         </tr>
                     </thead>
                     <tbody>
-                        ${documents.map(doc => `
+                        ${documents.map(doc => {
+                            const sectionCount = doc.metadata && doc.metadata.section_count !== undefined ? doc.metadata.section_count : 0;
+                            return `
                             <tr>
                                 <td><code>${doc.doc_id.substring(0, 12)}...</code></td>
                                 <td><strong>${doc.stock_code}</strong></td>
                                 <td>${doc.company_name}</td>
-                                <td><span class="badge bg-secondary">${doc.document_type}</span></td>
-                                <td><span class="badge bg-info">${doc.section_count}</span></td>
+                                <td><span class="badge bg-secondary">${doc.document_category || '未分类'}</span></td>
+                                <td><span class="badge bg-info">${sectionCount}</span></td>
                                 <td><small>${new Date(doc.created_at).toLocaleString()}</small></td>
-                            </tr>
-                        `).join('')}
+                            </tr>`;
+                        }).join('')}
                     </tbody>
                 </table>
             </div>

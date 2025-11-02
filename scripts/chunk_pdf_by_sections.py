@@ -57,6 +57,19 @@ SECTION_PATTERNS = [
     (r'^[（(]([一二三四五六七八九十]+)[)）]\s*(.{2,})$', 2),
     # 数字章节：1. 2. 3. （1-2位数字+点号+非数字开头的标题）
     (r'^(\d{1,2})\.\s+([^\d].{2,})$', 3),
+    # 冒号结尾标题（V2.2新增）：如"背景："、"目的："等（3-15字符+冒号）
+    (r'^()(.{3,15})[：:]$', 4),
+]
+
+# ====== 常见章节关键词（V2.2增强）======
+COMMON_SECTION_KEYWORDS = [
+    '背景', '目的', '详情', '詳情', '原因', '理由', '说明', '說明',
+    '时间表', '時間表', '安排', '程序', '流程', '步骤', '步驟',
+    '董事会', '董事會', '股东', '股東', '财务', '財務', '业绩', '業績',
+    '建议', '建議', '方案', '计划', '計劃', '决议', '決議', '公告',
+    '通函', '资本', '資本', '股份', '供股', '配售', '合股', '拆股',
+    '收购', '收購', '出售', '交易', '重组', '重組', '变更', '變更',
+    '附录', '附錄', '附件', '补充', '補充', '总结', '總結', '结论', '結論',
 ]
 
 
@@ -143,18 +156,35 @@ class PDFSectionChunker:
 
     def detect_section_level(self, line: str) -> Tuple[int, str, str]:
         """
-        检测章节标题及层级
+        检测章节标题及层级（V2.2增强版）
         返回: (层级, 章节编号, 章节标题)
         """
         line = line.strip()
 
+        # 1. 尝试匹配正则模式
         for pattern, level in SECTION_PATTERNS:
             match = re.match(pattern, line)
             if match:
                 if len(match.groups()) == 2:
                     section_num = match.group(1)
                     section_title = match.group(2).strip()
+                    
+                    # 如果是冒号结尾模式（level=4），检查是否包含常见关键词
+                    if level == 4:
+                        if any(kw in section_title for kw in COMMON_SECTION_KEYWORDS):
+                            return (level, section_num, section_title)
+                        else:
+                            continue  # 不是常见关键词，跳过
+                    
                     return (level, section_num, section_title)
+
+        # 2. 尝试匹配独立行常见关键词（V2.2新增）
+        # 短行（5-20字符）且包含常见章节关键词
+        if 5 <= len(line) <= 20:
+            for keyword in COMMON_SECTION_KEYWORDS:
+                if keyword in line:
+                    # 作为独立章节，级别5
+                    return (5, '', line)
 
         return (0, '', '')
 
@@ -356,14 +386,17 @@ class PDFSectionChunker:
         if doc_count != 1:
             raise ValueError(f"文档记录异常: 期望1条，实际{doc_count}条")
 
-        # 2. 验证章节记录数
+        # 2. 验证章节记录数（V2.2: section_count在metadata中）
         section_count = self.ch_client.query(
             f"SELECT count() FROM document_sections WHERE doc_id = '{self.doc_id}'"
         ).result_rows[0][0]
 
-        expected_count = self.ch_client.query(
-            f"SELECT section_count FROM documents_v2 WHERE doc_id = '{self.doc_id}'"
+        metadata_result = self.ch_client.query(
+            f"SELECT metadata FROM documents_v2 WHERE doc_id = '{self.doc_id}'"
         ).result_rows[0][0]
+        
+        metadata = json.loads(metadata_result) if metadata_result else {}
+        expected_count = metadata.get('section_count', 0)
 
         if section_count != expected_count:
             raise ValueError(f"章节数不匹配: 期望{expected_count}条，实际{section_count}条")

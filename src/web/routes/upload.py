@@ -351,9 +351,10 @@ async def scan_directory(
 async def upload_files_from_directory(
     request: dict
 ):
-    """从扫描的文件列表批量上传"""
+    """从扫描的文件列表批量上传（V2.2：保留目录结构）"""
     files = request.get('files', [])
     auto_filter = request.get('auto_filter', True)
+    base_path = request.get('base_path', '')  # 基础路径，用于计算相对路径
     task_ids = []
     skipped_files = []
 
@@ -375,10 +376,9 @@ async def upload_files_from_directory(
             })
             continue
 
-        # 复制文件到上传目录
-        target_path = UPLOAD_DIR / pdf_path.name
-        import shutil
-        shutil.copy2(pdf_path, target_path)
+        # V2.2：不复制文件，直接使用原始路径处理
+        # 这样可以保留完整的HKEX目录结构，从而自动提取分类
+        target_path = pdf_path
 
         # 再次检查过滤（如果需要）
         if auto_filter:
@@ -390,7 +390,7 @@ async def upload_files_from_directory(
             should_process, reason = filter_obj.should_process()
 
             if not should_process:
-                target_path.unlink()
+                # V2.2：不删除原始文件，只是跳过
                 skipped_files.append({
                     "file": pdf_path.name,
                     "reason": f"被过滤: {reason}"
