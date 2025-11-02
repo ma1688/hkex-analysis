@@ -52,8 +52,8 @@ async def tasks_page(request: Request):
 
 @app.get("/data", response_class=HTMLResponse)
 async def data_page(request: Request):
-    """数据管理页"""
-    return templates.TemplateResponse("data.html", {"request": request})
+    """数据管理页（V2.2）"""
+    return templates.TemplateResponse("data_v2.2.html", {"request": request})
 
 @app.get("/stats", response_class=HTMLResponse)
 async def stats_page(request: Request):

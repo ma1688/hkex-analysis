@@ -57,28 +57,34 @@ class TaskInfo(BaseModel):
     section_count: Optional[int] = None
 
 class DocumentInfo(BaseModel):
-    """文档信息模型"""
+    """文档信息模型（V2.2）"""
     doc_id: str
     stock_code: str
     company_name: str
-    title: Optional[str] = None  # 文档标题
-    document_type: str
-    document_subtype: str
+    announcement_title: str  # V2.2: 公告标题（从文件名提取）
+    document_category: str  # V2.2: 文档主分类（一级目录）
+    announcement_category: str  # V2.2: 公告子分类（二级目录）
     announcement_date: datetime
-    section_count: int
-    metadata: Dict[str, Any]
+    file_path: str  # V2.2: 文件路径
+    page_count: int  # V2.2: PDF总页数
+    metadata: Dict[str, Any]  # V2.2: 包含document_subtype, section_count等
     created_at: datetime
 
 class SectionInfo(BaseModel):
-    """章节信息模型"""
+    """章节信息模型（V2.2）"""
     section_id: str
     doc_id: str
+    document_category: str  # V2.2: 文档主分类（冗余字段）
+    announcement_category: str  # V2.2: 公告子分类（冗余字段）
     section_type: str
     section_title: str
     section_index: int
+    page_start: int  # V2.2: 起始页码
+    page_end: int  # V2.2: 结束页码
     content: str
-    char_count: int
-    metadata: Dict[str, Any]
+    priority: int  # V2.2: 优先级
+    metadata: Dict[str, Any]  # V2.2: 包含section_num, has_table等
+    created_at: datetime  # V2.2: 创建时间
 
 class Statistics(BaseModel):
     """统计数据模型"""

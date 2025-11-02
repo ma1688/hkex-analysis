@@ -61,9 +61,9 @@ class DataService:
         try:
             query = """
             SELECT
-                doc_id, stock_code, company_name, title, document_type,
-                document_subtype, announcement_date, section_count,
-                metadata, created_at
+                doc_id, stock_code, company_name, announcement_title,
+                document_category, announcement_category, announcement_date,
+                file_path, page_count, metadata, created_at
             FROM documents_v2
             """
 
@@ -73,7 +73,8 @@ class DataService:
                 conditions.append(f"stock_code = '{stock_code}'")
 
             if document_type:
-                conditions.append(f"document_type = '{document_type}'")
+                # V2.2: document_type在metadata中，使用document_category过滤
+                conditions.append(f"document_category = '{document_type}'")
 
             if conditions:
                 query += " WHERE " + " AND ".join(conditions)
@@ -95,13 +96,14 @@ class DataService:
                     doc_id=row[0],
                     stock_code=row[1],
                     company_name=row[2],
-                    title=row[3],
-                    document_type=row[4],
-                    document_subtype=row[5],
+                    announcement_title=row[3],
+                    document_category=row[4],
+                    announcement_category=row[5],
                     announcement_date=row[6],
-                    section_count=row[7],
-                    metadata=eval(row[8]) if row[8] else {},
-                    created_at=row[9]
+                    file_path=row[7],
+                    page_count=row[8],
+                    metadata=eval(row[9]) if row[9] else {},
+                    created_at=row[10]
                 )
                 documents.append(doc)
 
@@ -119,9 +121,9 @@ class DataService:
         try:
             query = f"""
             SELECT
-                doc_id, stock_code, company_name, title, document_type,
-                document_subtype, announcement_date, section_count,
-                metadata, created_at
+                doc_id, stock_code, company_name, announcement_title,
+                document_category, announcement_category, announcement_date,
+                file_path, page_count, metadata, created_at
             FROM documents_v2
             WHERE doc_id = '{doc_id}'
             """
@@ -136,13 +138,14 @@ class DataService:
                 doc_id=row[0],
                 stock_code=row[1],
                 company_name=row[2],
-                title=row[3],
-                document_type=row[4],
-                document_subtype=row[5],
+                announcement_title=row[3],
+                document_category=row[4],
+                announcement_category=row[5],
                 announcement_date=row[6],
-                section_count=row[7],
-                metadata=eval(row[8]) if row[8] else {},
-                created_at=row[9]
+                file_path=row[7],
+                page_count=row[8],
+                metadata=eval(row[9]) if row[9] else {},
+                created_at=row[10]
             )
         except Exception as e:
             print(f"获取文档失败: {e}")
@@ -157,8 +160,9 @@ class DataService:
         try:
             query = f"""
             SELECT
-                section_id, doc_id, section_type, section_title,
-                section_index, content, char_count, metadata
+                section_id, doc_id, document_category, announcement_category,
+                section_type, section_title, section_index, page_start, page_end,
+                content, priority, metadata, created_at
             FROM document_sections
             WHERE doc_id = '{doc_id}'
             ORDER BY section_index
@@ -172,12 +176,17 @@ class DataService:
                 section = SectionInfo(
                     section_id=row[0],
                     doc_id=row[1],
-                    section_type=row[2],
-                    section_title=row[3],
-                    section_index=row[4],
-                    content=row[5],
-                    char_count=row[6],
-                    metadata=eval(row[7]) if row[7] else {}
+                    document_category=row[2],
+                    announcement_category=row[3],
+                    section_type=row[4],
+                    section_title=row[5],
+                    section_index=row[6],
+                    page_start=row[7],
+                    page_end=row[8],
+                    content=row[9],
+                    priority=row[10],
+                    metadata=eval(row[11]) if row[11] else {},
+                    created_at=row[12]
                 )
                 sections.append(section)
 
@@ -215,12 +224,12 @@ class DataService:
                 "SELECT count() FROM document_sections"
             ).result_rows[0][0]
 
-            # 按类型统计
+            # 按分类统计（V2.2: 使用document_category）
             documents_by_type = {}
             type_result = self.client.query("""
-                SELECT document_type, count() as cnt
+                SELECT document_category, count() as cnt
                 FROM documents_v2
-                GROUP BY document_type
+                GROUP BY document_category
             """).result_rows
 
             for row in type_result:
@@ -399,12 +408,13 @@ class DataService:
             search_pattern = f'%{query}%'
             search_query = f"""
             SELECT
-                doc_id, stock_code, company_name, title, document_type,
-                document_subtype, announcement_date, section_count,
-                metadata, created_at
+                doc_id, stock_code, company_name, announcement_title,
+                document_category, announcement_category, announcement_date,
+                file_path, page_count, metadata, created_at
             FROM documents_v2
             WHERE company_name ILIKE '{search_pattern}'
                OR stock_code = '{query}'
+               OR announcement_title ILIKE '{search_pattern}'
             ORDER BY created_at DESC
             LIMIT {limit}
             """
@@ -417,13 +427,14 @@ class DataService:
                     doc_id=row[0],
                     stock_code=row[1],
                     company_name=row[2],
-                    title=row[3],
-                    document_type=row[4],
-                    document_subtype=row[5],
+                    announcement_title=row[3],
+                    document_category=row[4],
+                    announcement_category=row[5],
                     announcement_date=row[6],
-                    section_count=row[7],
-                    metadata=eval(row[8]) if row[8] else {},
-                    created_at=row[9]
+                    file_path=row[7],
+                    page_count=row[8],
+                    metadata=eval(row[9]) if row[9] else {},
+                    created_at=row[10]
                 )
                 documents.append(doc)
 
